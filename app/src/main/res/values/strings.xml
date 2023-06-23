@@ -9,4 +9,9 @@
 
     <string name="hello_first_fragment">Hello first fragment</string>
     <string name="hello_second_fragment">Hello second fragment. Arg: %1$s</string>
+    <string name="work_in_progress">Work in progress...</string>
+    <string name="ok">Ok</string>
+    <string name="test_log">Test log</string>
+    <string name="loading">Loading...</string>
+    <string name="no_network">No connection available, please check your internet connection.</string>
 </resources>
