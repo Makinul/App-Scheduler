@@ -3,9 +3,12 @@ package com.makinu.app.scheduler.ui.main.home
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
+import android.graphics.*
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.PaintDrawable
 import android.os.Build
 import android.util.Log
 import androidx.lifecycle.LiveData
@@ -16,12 +19,15 @@ import com.makinu.app.scheduler.data.Event
 import com.makinu.app.scheduler.data.Resource
 import com.makinu.app.scheduler.data.local.db.AppInfoDao
 import com.makinu.app.scheduler.data.model.AppInfo
+import com.makinu.app.scheduler.data.model.AppUiInfo
 import com.makinu.app.scheduler.utils.MyPreference
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.*
 import javax.inject.Inject
+import kotlin.collections.ArrayList
 
 
 @HiltViewModel
@@ -50,6 +56,78 @@ class HomeViewModel @Inject constructor(
 //    fun getCurrentUser() = viewModelScope.launch {
 //        preference.getUser()
 //    }
+
+    private val _appUiInfos by lazy { MutableLiveData<Event<Resource<List<AppUiInfo>>>>() }
+    val appUiInfos: LiveData<Event<Resource<List<AppUiInfo>>>>
+        get() = _appUiInfos
+
+    @SuppressLint("QueryPermissionsNeeded")
+    fun getAllInstalledAppsUsingQuery(context: Context) = viewModelScope.launch(Dispatchers.IO) {
+        _appUiInfos.postValue(Event(Resource.loading()))
+        delay(2000)
+
+        val items = ArrayList<AppUiInfo>()
+        val pm: PackageManager = context.packageManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val applicationInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(PackageManager.GET_META_DATA.toLong()))
+            } else {
+                pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            }
+
+            for (applicationInfo in applicationInfoList) {
+                val appInfo = AppUiInfo()
+                appInfo.packageName = applicationInfo.packageName
+                appInfo.appName = pm.getApplicationLabel(applicationInfo).toString()
+
+//                appInfo.icon = getIcon(context, pm, resolveInfo)
+
+                items.add(appInfo)
+            }
+        } else {
+            val mainIntent = Intent(Intent.ACTION_MAIN, null)
+            mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
+            val resolveInfoList =
+                pm.queryIntentActivities(mainIntent, PackageManager.GET_META_DATA)
+
+            for (resolveInfo in resolveInfoList) {
+                val appInfo = AppUiInfo()
+                appInfo.packageName = resolveInfo.activityInfo.applicationInfo.packageName
+                appInfo.appName = resolveInfo.loadLabel(pm).toString()
+                appInfo.icon = getIcon(context, pm, resolveInfo)
+
+                items.add(appInfo)
+            }
+        }
+
+        _appUiInfos.postValue(Event(Resource.success(items)))
+    }
+
+    private fun getIcon(context: Context, pm: PackageManager, resolveInfo: ResolveInfo): Bitmap {
+        var icon = resolveInfo.loadIcon(pm)
+        val width = 60
+        val height = 60
+        if (icon is PaintDrawable) {
+            icon.intrinsicWidth = width
+            icon.intrinsicHeight = height
+        }
+
+        val c =
+            if (icon.opacity != PixelFormat.OPAQUE) Bitmap.Config.ARGB_8888 else Bitmap.Config.RGB_565
+        val thumb = Bitmap.createBitmap(width, height, c)
+        val canvas = Canvas(thumb)
+        canvas.drawFilter = PaintFlagsDrawFilter(Paint.DITHER_FLAG, 0)
+
+        val mOldBounds = Rect()
+        mOldBounds.set(icon.bounds)
+        icon.setBounds(0, 0, width, height)
+        icon.draw(canvas)
+        icon.bounds = mOldBounds
+
+        icon = BitmapDrawable(context.resources, thumb)
+
+        return icon.bitmap
+    }
 
     private val _appStatus by lazy { MutableLiveData<Event<Resource<List<AppInfo>>>>() }
     val appStatus: LiveData<Event<Resource<List<AppInfo>>>>
@@ -82,6 +160,8 @@ class HomeViewModel @Inject constructor(
         for (applicationInfo in applicationInfoList) {
             Log.v("TAG", "App Name: ${applicationInfo.loadLabel(pm)}")
         }
+
+        getInstalledApps(context)
     }
 
     @SuppressLint("QueryPermissionsNeeded")
@@ -101,10 +181,10 @@ class HomeViewModel @Inject constructor(
 
         var counter = 0
         for (applicationInfo in applicationInfoList) {
-            if (applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0) {
-                Log.v("TAG", "App Name $counter: ${pm.getApplicationLabel(applicationInfo)}")
-                counter++
-            }
+//            if (applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0) {
+            Log.v("TAG", "App Name $counter: ${pm.getApplicationLabel(applicationInfo)}")
+            counter++
+//            }
 //            val packageInfo = pm.getPackageInfoCompat(applicationInfo.packageName)
 //            Log.v("TAG", "Package Name: ${applicationInfo.packageName}")
 
@@ -142,7 +222,10 @@ class HomeViewModel @Inject constructor(
         var counter = 0
         for (packageInfo in applicationInfoList) {
 //            if (applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0) {
-            Log.v("TAG", "App Name $counter: ${pm.getApplicationLabel(packageInfo.applicationInfo)}")
+            Log.v(
+                "TAG",
+                "App Name $counter: ${pm.getApplicationLabel(packageInfo.applicationInfo)}"
+            )
             counter++
 //            }
 //            val packageInfo = pm.getPackageInfoCompat(applicationInfo.packageName)

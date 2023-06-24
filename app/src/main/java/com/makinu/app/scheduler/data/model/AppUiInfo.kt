@@ -1,13 +1,16 @@
 package com.makinu.app.scheduler.data.model
 
+import android.graphics.Bitmap
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.util.Date
 
 @Entity
-data class AppInfo(
-    @PrimaryKey var packageName: String = "",
+data class AppUiInfo(
+    var packageName: String = "",
     var appName: String = "",
-    var scheduleTime: String? = null,
+    var icon: Bitmap? = null,
+    var scheduleTime: Date = Date(0),
     var isScheduled: Boolean = false
 ) {
     override fun toString(): String {

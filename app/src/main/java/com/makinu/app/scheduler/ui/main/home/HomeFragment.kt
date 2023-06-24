@@ -7,9 +7,11 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView.VERTICAL
 import com.makinu.app.scheduler.R
 import com.makinu.app.scheduler.data.Status
-import com.makinu.app.scheduler.data.model.AppInfo
+import com.makinu.app.scheduler.data.model.AppUiInfo
 import com.makinu.app.scheduler.databinding.FragmentHomeBinding
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -31,10 +33,26 @@ class HomeFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
-        return binding.root
 
+        prepareRecyclerView()
+        return binding.root
+    }
+
+    private val items: ArrayList<AppUiInfo> = ArrayList()
+    private lateinit var adapter: AppInfoAdapter
+
+    private fun prepareRecyclerView() {
+        adapter = AppInfoAdapter(items, object : AppInfoAdapter.OnClickListener {
+            override fun clickOnView(position: Int, item: AppUiInfo) {
+
+            }
+        })
+
+        binding.recyclerView.apply {
+            layoutManager = LinearLayoutManager(requireActivity(), VERTICAL, false)
+            adapter = this@HomeFragment.adapter
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -44,7 +62,7 @@ class HomeFragment : Fragment() {
             findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
         }
 
-        viewModel.appStatus.observe(viewLifecycleOwner) { response ->
+        viewModel.appUiInfos.observe(viewLifecycleOwner) { response ->
             response.getContentIfNotHandled()?.let {
                 when (it.status) {
                     Status.LOADING -> {
@@ -63,15 +81,13 @@ class HomeFragment : Fragment() {
                 }
             }
         }
-        viewModel.getAppStatus()
-        context?.let { viewModel.getQueryApps(it) }
+//        viewModel.getAppStatus()
+        context?.let { viewModel.getAllInstalledAppsUsingQuery(it) }
     }
 
     private fun updateView() {
-
+        adapter.notifyDataSetChanged()
     }
-
-    private val items: ArrayList<AppInfo> = ArrayList()
 
     override fun onDestroyView() {
         super.onDestroyView()
