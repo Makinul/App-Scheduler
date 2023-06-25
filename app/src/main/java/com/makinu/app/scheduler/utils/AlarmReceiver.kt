@@ -39,34 +39,13 @@ class AlarmReceiver : BroadcastReceiver() {
                     context.startActivity(fireIntent)
             }
         }
-        // Wake the device and stay awake until the AlarmAlert intent is
-        // handled. Also acquire the screen lock so that if the AlarmAlert
-        // activity is paused, it will be resumed.
-//        AlarmAlertWakeLock.acquireCpuWakeLock(context)
-//        AlarmAlertWakeLock.acquireScreenWakeLock(context)
-
-//        /* Close dialogs and window shade */
-//        val i = Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
-//        context.sendBroadcast(i)
-//        // Decide which activity to start based on the state of the keyguard.
-//        var c: Class<*> = AlarmAlert::class.java
-//        val km = context.getSystemService(
-//            Context.KEYGUARD_SERVICE
-//        ) as KeyguardManager
-//        if (km.inKeyguardRestrictedInputMode()) {
-//            // Use the full screen activity for security.
-//            c = AlarmAlertFullScreen::class.java
-//        }
-//        /* launch UI, explicitly stating that this is not due to user action
-//         * so that the current app's notification management is not disturbed */
-//        val fireAlarm = Intent(context, c)
-//        fireAlarm.putExtra("Alarms.ID", id)
-//        fireAlarm.putExtra("Alarms.LABEL", intent.getStringExtra("Alarms.LABEL"))
-//        fireAlarm.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION
-//        context.startActivity(fireAlarm)
 
         createNotificationChannel(context)
         generateNotification(context, uid, appName, packageName)
+
+        // Todo, need few more time finish the following task
+        // need to access the database to get the scheduled time and status
+        // to re activate the schedule the app if we don't use interval facility
     }
 
     private val CHANNEL_ID = "CHANNEL_ID"

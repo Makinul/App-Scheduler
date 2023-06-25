@@ -151,6 +151,7 @@ class HomeFragment : BaseFragment() {
             set(Calendar.MINUTE, minute)
         }
 
+        // it trigger approximate time
 //        alarmManager?.setInexactRepeating(
 //            AlarmManager.RTC_WAKEUP,
 //            calendar.timeInMillis,
@@ -158,6 +159,7 @@ class HomeFragment : BaseFragment() {
 //            alarmIntent
 //        )
 
+        // to schedule in exact time
         alarmManager?.setExact(
             AlarmManager.RTC_WAKEUP,
             calendar.timeInMillis,
@@ -250,6 +252,11 @@ class HomeFragment : BaseFragment() {
             } else {
                 ":0$minute"
             }
+
+            // Todo, need few more time finish the following task
+            // we need to check here time conflicting issue
+            // while saving the data into database and set alarm
+
             appInfo.isScheduled = dBinding.switchButton.isChecked
             val message = if (appInfo.isScheduled) {
                 viewModel.setAlarm(appInfo)
