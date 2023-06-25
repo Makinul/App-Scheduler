@@ -3,13 +3,15 @@ package com.makinu.app.scheduler.ui.main.home
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.PaintDrawable
 import android.os.Build
+import android.os.UserManager
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -23,12 +25,9 @@ import com.makinu.app.scheduler.data.model.AppUiInfo
 import com.makinu.app.scheduler.utils.MyPreference
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.*
 import javax.inject.Inject
-import kotlin.collections.ArrayList
-
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -36,6 +35,20 @@ class HomeViewModel @Inject constructor(
     private val dao: AppInfoDao
 ) : ViewModel() {
 
+    fun setAlarm(appUiInfo: AppUiInfo) = viewModelScope.launch(Dispatchers.IO) {
+        val aInfo = AppInfo()
+        aInfo.uid = appUiInfo.uid
+        aInfo.packageName = appUiInfo.packageName
+        aInfo.appName = appUiInfo.appName
+        aInfo.scheduleTime = appUiInfo.scheduleTime
+        aInfo.isScheduled = true
+
+        dao.insert(aInfo)
+    }
+
+    fun cancelAlarm(packageName: String) = viewModelScope.launch(Dispatchers.IO) {
+        dao.delete(packageName)
+    }
 //    private val _homeContents by lazy { MutableLiveData<Event<Resource<List<CommonContent>>>>() }
 //    val homeContents: LiveData<Event<Resource<List<CommonContent>>>>
 //        get() = _homeContents
@@ -57,6 +70,40 @@ class HomeViewModel @Inject constructor(
 //        preference.getUser()
 //    }
 
+    fun getLauncherApps(context: Context) = viewModelScope.launch(Dispatchers.IO) {
+        _appUiInfos.postValue(Event(Resource.loading()))
+        val items = ArrayList<AppUiInfo>()
+
+        val launcherApps: LauncherApps =
+            context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
+        val userManager = context.getSystemService(Context.USER_SERVICE) as UserManager
+
+        val packageNameRestriction: String? = null
+        val profiles = userManager.userProfiles
+
+        for (profile in profiles) {
+            val appList = launcherApps.getActivityList(packageNameRestriction, profile)
+            for (info in appList) {
+                val appInfo = AppUiInfo()
+                appInfo.uid = info.applicationInfo.uid
+                appInfo.packageName = info.applicationInfo.packageName
+                appInfo.appName = info.label.toString()
+                appInfo.componentName = info.componentName
+                appInfo.userHandle = profile
+                appInfo.icon = getBitmapIcon(context, info.getBadgedIcon(0))
+
+                dao.getAppInfoById(appInfo.packageName)?.let {
+                    appInfo.scheduleTime = it.scheduleTime
+                    appInfo.isScheduled = it.isScheduled
+                }
+
+                items.add(appInfo)
+            }
+        }
+
+        _appUiInfos.postValue(Event(Resource.success(items)))
+    }
+
     private val _appUiInfos by lazy { MutableLiveData<Event<Resource<List<AppUiInfo>>>>() }
     val appUiInfos: LiveData<Event<Resource<List<AppUiInfo>>>>
         get() = _appUiInfos
@@ -64,8 +111,6 @@ class HomeViewModel @Inject constructor(
     @SuppressLint("QueryPermissionsNeeded")
     fun getAllInstalledAppsUsingQuery(context: Context) = viewModelScope.launch(Dispatchers.IO) {
         _appUiInfos.postValue(Event(Resource.loading()))
-        delay(2000)
-
         val items = ArrayList<AppUiInfo>()
         val pm: PackageManager = context.packageManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -77,10 +122,12 @@ class HomeViewModel @Inject constructor(
 
             for (applicationInfo in applicationInfoList) {
                 val appInfo = AppUiInfo()
+                appInfo.uid = applicationInfo.uid
                 appInfo.packageName = applicationInfo.packageName
                 appInfo.appName = pm.getApplicationLabel(applicationInfo).toString()
 
-//                appInfo.icon = getIcon(context, pm, resolveInfo)
+                appInfo.icon =
+                    getBitmapIcon(context, pm.getApplicationIcon(applicationInfo.packageName))
 
                 items.add(appInfo)
             }
@@ -94,7 +141,7 @@ class HomeViewModel @Inject constructor(
                 val appInfo = AppUiInfo()
                 appInfo.packageName = resolveInfo.activityInfo.applicationInfo.packageName
                 appInfo.appName = resolveInfo.loadLabel(pm).toString()
-                appInfo.icon = getIcon(context, pm, resolveInfo)
+                appInfo.icon = getBitmapIcon(context, resolveInfo.loadIcon(pm))
 
                 items.add(appInfo)
             }
@@ -103,10 +150,9 @@ class HomeViewModel @Inject constructor(
         _appUiInfos.postValue(Event(Resource.success(items)))
     }
 
-    private fun getIcon(context: Context, pm: PackageManager, resolveInfo: ResolveInfo): Bitmap {
-        var icon = resolveInfo.loadIcon(pm)
-        val width = 60
-        val height = 60
+    private fun getBitmapIcon(context: Context, icon: Drawable): Bitmap {
+        val width = 100
+        val height = 100
         if (icon is PaintDrawable) {
             icon.intrinsicWidth = width
             icon.intrinsicHeight = height
@@ -124,9 +170,7 @@ class HomeViewModel @Inject constructor(
         icon.draw(canvas)
         icon.bounds = mOldBounds
 
-        icon = BitmapDrawable(context.resources, thumb)
-
-        return icon.bitmap
+        return BitmapDrawable(context.resources, thumb).bitmap
     }
 
     private val _appStatus by lazy { MutableLiveData<Event<Resource<List<AppInfo>>>>() }

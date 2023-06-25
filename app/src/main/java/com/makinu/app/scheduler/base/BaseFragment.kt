@@ -12,12 +12,6 @@ import com.makinu.app.scheduler.R
 import com.makinu.app.scheduler.utils.MyPreference
 
 open class BaseFragment : Fragment() {
-    protected lateinit var preference: MyPreference
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        preference = MyPreference(requireContext())
-    }
 
     fun showSimpleDialog(@StringRes resourceId: Int = R.string.work_in_progress) {
         showSimpleDialog(getString(resourceId))

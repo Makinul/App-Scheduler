@@ -1,16 +1,19 @@
 package com.makinu.app.scheduler.data.model
 
+import android.content.ComponentName
 import android.graphics.Bitmap
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-import java.util.Date
+import android.graphics.Rect
+import android.os.UserHandle
 
-@Entity
 data class AppUiInfo(
+    var uid: Int = -1,
     var packageName: String = "",
     var appName: String = "",
+    var componentName: ComponentName? = null,
+    var userHandle: UserHandle? = null,
+    val rect: Rect? = null,
     var icon: Bitmap? = null,
-    var scheduleTime: Date = Date(0),
+    var scheduleTime: String? = null,
     var isScheduled: Boolean = false
 ) {
     override fun toString(): String {

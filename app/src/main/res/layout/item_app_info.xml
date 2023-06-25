@@ -16,21 +16,21 @@
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/icon"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
+            android:layout_width="@dimen/app_icon_size"
+            android:layout_height="@dimen/app_icon_size"
+            android:scaleType="fitCenter"
             android:src="@mipmap/ic_launcher"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/app_name"
+            style="@style/AppNameTextAppearance"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:singleLine="true"
             android:layout_marginStart="@dimen/default_margin_small"
+            android:singleLine="true"
             android:text="App Name"
-            android:textColor="@color/black"
-            android:textSize="24sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_weight="1"
             app:layout_constraintStart_toEndOf="@id/icon"
@@ -45,5 +45,14 @@
             app:layout_constraintEnd_toEndOf="@id/app_name"
             app:layout_constraintStart_toStartOf="@id/app_name"
             app:layout_constraintTop_toBottomOf="@id/app_name" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/schedule_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/schedule_active"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>

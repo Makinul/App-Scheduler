@@ -3,4 +3,8 @@
     <dimen name="default_margin_small">10dp</dimen>
     <dimen name="default_margin_tiny">5dp</dimen>
     <dimen name="default_margin">16dp</dimen>
+    <dimen name="dialog_corner_radius">10dp</dimen>
+    <dimen name="dialog_cross_button_height">30dp</dimen>
+    <dimen name="app_icon_size">100dp</dimen>
+    <dimen name="app_name_text_size">24sp</dimen>
 </resources>

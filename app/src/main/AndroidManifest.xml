@@ -4,17 +4,14 @@
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <permission
+    <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="ReservedSystemPermission" />
-
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.action.LAUNCHER" />
-        </intent>
-    </queries>
+        tools:ignore="QueryAllPackagesPermission" />
 
     <application
         android:name=".base.MyApp"
@@ -25,10 +22,17 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppScheduler"
+        tools:ignore="UnusedAttribute"
         tools:targetApi="31">
         <activity
             android:name=".ui.main.MainActivity"
+            android:clearTaskOnLaunch="true"
+            android:configChanges="orientation"
+            android:excludeFromRecents="true"
             android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:taskAffinity=""
             android:theme="@style/Theme.AppScheduler.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -36,6 +40,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver android:name=".utils.AlarmReceiver" />
+
+        <receiver
+            android:name=".utils.MyBootReceiver"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

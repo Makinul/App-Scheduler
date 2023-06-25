@@ -3,7 +3,9 @@ package com.makinu.app.scheduler.ui.main.home
 import android.content.Context
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.makinu.app.scheduler.R
 import com.makinu.app.scheduler.data.model.AppInfo
 import com.makinu.app.scheduler.data.model.AppUiInfo
 import com.makinu.app.scheduler.databinding.ItemAppInfoBinding
@@ -50,6 +52,53 @@ class AppInfoAdapter(
             binding.appName.text = item.appName
             binding.packageName.text = item.packageName
             binding.icon.setImageBitmap(item.icon)
+
+            val color = if (item.isScheduled) {
+                var scheduleTime = item.scheduleTime
+                item.scheduleTime?.let { time ->
+                    if (time.contains(":")) {
+                        val parts = time.split(":")
+                        if (parts.size > 1) {
+                            try {
+                                var hour = parts[0].toInt()
+                                val minute = parts[1].toInt()
+
+                                val am_pm = if (hour > 11) {
+                                    hour -= 12
+                                    "PM"
+                                } else {
+                                    "AM"
+                                }
+                                if (hour == 0)
+                                    hour = 12
+
+                                scheduleTime = if (hour < 10) {
+                                    "0$hour"
+                                } else {
+                                    "$hour"
+                                }
+
+                                scheduleTime += if (minute < 10) {
+                                    ":0$minute"
+                                } else {
+                                    ":$minute"
+                                }
+
+                                scheduleTime += " $am_pm"
+                            } catch (e: java.lang.NumberFormatException) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                }
+                binding.scheduleStatus.text =
+                    context.getString(R.string.schedule_active, scheduleTime)
+                ContextCompat.getColor(context, R.color.positive)
+            } else {
+                binding.scheduleStatus.text = context.getString(R.string.schedule_off)
+                ContextCompat.getColor(context, R.color.negative)
+            }
+            binding.scheduleStatus.setTextColor(color)
         }
     }
 

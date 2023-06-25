@@ -9,8 +9,8 @@ interface AppInfoDao {
     @Query("SELECT * FROM appinfo")
     fun getAll(): List<AppInfo>
 
-//    @Query("SELECT * FROM appinfo WHERE memberId = :memberId LIMIT 1")
-//    fun getTreeById(memberId: String): AppInfo?
+    @Query("SELECT * FROM appinfo WHERE packageName = :packageName LIMIT 1")
+    fun getAppInfoById(packageName: String): AppInfo?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(appInfo: AppInfo)
@@ -21,8 +21,8 @@ interface AppInfoDao {
     @Delete
     fun delete(appInfo: AppInfo)
 
-//    @Query("DELETE FROM appinfo where memberId = :memberId")
-//    fun delete(memberId: String)
+    @Query("DELETE FROM appinfo where packageName = :packageName")
+    fun delete(packageName: String)
 
     @Query("DELETE FROM appinfo")
     suspend fun deleteAll()

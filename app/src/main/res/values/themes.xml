@@ -22,4 +22,9 @@
     <style name="Theme.AppScheduler.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
 
     <style name="Theme.AppScheduler.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
+
+    <style name="AppNameTextAppearance" parent="TextAppearance.AppCompat.Body1">
+        <item name="android:textColor">@color/black</item>
+        <item name="android:textSize">@dimen/app_name_text_size</item>
+    </style>
 </resources>

@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 @Entity
 data class AppInfo(
     @PrimaryKey var packageName: String = "",
+    var uid: Int = -1,
     var appName: String = "",
     var scheduleTime: String? = null,
     var isScheduled: Boolean = false

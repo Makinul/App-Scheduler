@@ -22,17 +22,12 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
 import com.makinu.app.scheduler.R
-import com.makinu.app.scheduler.utils.MyPreference
 import java.io.IOException
 
 open class BaseActivity : AppCompatActivity() {
 
-    protected lateinit var preference: MyPreference
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        preference = MyPreference(this)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             val connectivityManager =
@@ -111,7 +106,7 @@ open class BaseActivity : AppCompatActivity() {
             snackBar = Snackbar.make(
                 view,
                 R.string.no_network,
-                Snackbar.LENGTH_INDEFINITE
+                Snackbar.LENGTH_LONG
             )
             snackBar!!.setBackgroundTint(ContextCompat.getColor(this, R.color.default_error))
         }
