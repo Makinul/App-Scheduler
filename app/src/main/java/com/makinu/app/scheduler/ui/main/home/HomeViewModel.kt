@@ -22,7 +22,6 @@ import com.makinu.app.scheduler.data.Resource
 import com.makinu.app.scheduler.data.local.db.AppInfoDao
 import com.makinu.app.scheduler.data.model.AppInfo
 import com.makinu.app.scheduler.data.model.AppUiInfo
-import com.makinu.app.scheduler.utils.MyPreference
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,23 +30,27 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val preference: MyPreference,
     private val dao: AppInfoDao
 ) : ViewModel() {
 
     fun setAlarm(appUiInfo: AppUiInfo) = viewModelScope.launch(Dispatchers.IO) {
-        val aInfo = AppInfo()
-        aInfo.uid = appUiInfo.uid
-        aInfo.packageName = appUiInfo.packageName
-        aInfo.appName = appUiInfo.appName
-        aInfo.scheduleTime = appUiInfo.scheduleTime
-        aInfo.isScheduled = true
-
-        dao.insert(aInfo)
+        var appInfo = dao.getAppInfoByPackageName(appUiInfo.packageName)
+        if (appInfo == null) {
+            appInfo = AppInfo()
+            appInfo.uid = appUiInfo.uid
+            appInfo.packageName = appUiInfo.packageName
+            appInfo.appName = appUiInfo.appName
+            appInfo.scheduleTime = appUiInfo.scheduleTime
+            appInfo.isScheduled = true
+        } else {
+            appInfo.isScheduled = true
+            appInfo.successfulScheduledCounter += 1
+        }
+        dao.insert(appInfo)
     }
 
     fun cancelAlarm(packageName: String) = viewModelScope.launch(Dispatchers.IO) {
-        dao.delete(packageName)
+        dao.cancelSchedule(packageName)
     }
 //    private val _homeContents by lazy { MutableLiveData<Event<Resource<List<CommonContent>>>>() }
 //    val homeContents: LiveData<Event<Resource<List<CommonContent>>>>
@@ -92,7 +95,7 @@ class HomeViewModel @Inject constructor(
                 appInfo.userHandle = profile
                 appInfo.icon = getBitmapIcon(context, info.getBadgedIcon(0))
 
-                dao.getAppInfoById(appInfo.packageName)?.let {
+                dao.getAppInfoByPackageName(appInfo.packageName)?.let {
                     appInfo.scheduleTime = it.scheduleTime
                     appInfo.isScheduled = it.isScheduled
                 }

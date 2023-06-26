@@ -22,7 +22,7 @@ import com.makinu.app.scheduler.data.Status
 import com.makinu.app.scheduler.data.model.AppUiInfo
 import com.makinu.app.scheduler.databinding.DialogAppScheduleDetailsBinding
 import com.makinu.app.scheduler.databinding.FragmentHomeBinding
-import com.makinu.app.scheduler.utils.AlarmReceiver
+import com.makinu.app.scheduler.utils.ScheduleReceiver
 import com.makinu.app.scheduler.utils.AppConstants
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.*
@@ -115,9 +115,7 @@ class HomeFragment : BaseFragment() {
 
     private fun cancelAlarm(item: AppUiInfo) {
         val alarmManager = context?.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-        val alarmIntent = Intent(context, AlarmReceiver::class.java).let { intent ->
-            intent.putExtra(AppConstants.KEY_APP_NAME, item.appName)
-            intent.putExtra(AppConstants.KEY_PACKAGE_NAME, item.packageName)
+        val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
             PendingIntent.getBroadcast(context, item.uid, intent, PendingIntent.FLAG_CANCEL_CURRENT)
         }
         if (alarmIntent != null && alarmManager != null) {
@@ -127,10 +125,13 @@ class HomeFragment : BaseFragment() {
 
     private fun setAlarm(item: AppUiInfo, hour: Int, minute: Int) {
         val alarmManager = context?.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-        val alarmIntent = Intent(context, AlarmReceiver::class.java).let { intent ->
+        val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
             intent.putExtra(AppConstants.KEY_APP_UID, item.uid)
             intent.putExtra(AppConstants.KEY_APP_NAME, item.appName)
             intent.putExtra(AppConstants.KEY_PACKAGE_NAME, item.packageName)
+
+            intent.putExtra(AppConstants.KEY_ALARM_HOUR, hour)
+            intent.putExtra(AppConstants.KEY_ALARM_MINUTE, minute)
 
             PendingIntent.getBroadcast(context, item.uid, intent, PendingIntent.FLAG_CANCEL_CURRENT)
         }
@@ -271,7 +272,7 @@ class HomeFragment : BaseFragment() {
             loginDialog.dismiss()
 
             items[position] = appInfo
-            adapter.notifyItemChanged(position)
+            adapter.notifyItemChanged(position, true)
         }
 
         dBinding.cancelButton.setOnClickListener {

@@ -9,7 +9,8 @@ data class AppInfo(
     var uid: Int = -1,
     var appName: String = "",
     var scheduleTime: String? = null,
-    var isScheduled: Boolean = false
+    var isScheduled: Boolean = false,
+    var successfulScheduledCounter: Int = 0
 ) {
     override fun toString(): String {
         return appName

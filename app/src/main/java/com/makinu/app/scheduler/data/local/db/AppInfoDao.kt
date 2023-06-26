@@ -10,10 +10,13 @@ interface AppInfoDao {
     fun getAll(): List<AppInfo>
 
     @Query("SELECT * FROM appinfo WHERE packageName = :packageName LIMIT 1")
-    fun getAppInfoById(packageName: String): AppInfo?
+    fun getAppInfoByPackageName(packageName: String): AppInfo?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(appInfo: AppInfo)
+
+    @Update
+    fun update(appInfo: AppInfo)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertAll(appInfos: List<AppInfo>)
@@ -23,6 +26,9 @@ interface AppInfoDao {
 
     @Query("DELETE FROM appinfo where packageName = :packageName")
     fun delete(packageName: String)
+
+    @Query("UPDATE appinfo SET isScheduled = 0 where packageName = :packageName")
+    fun cancelSchedule(packageName: String)
 
     @Query("DELETE FROM appinfo")
     suspend fun deleteAll()
