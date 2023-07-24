@@ -16,6 +16,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.makinu.app.scheduler.R
+import com.makinu.app.scheduler.data.local.db.AppDatabase
 import com.makinu.app.scheduler.data.local.db.AppInfoDao
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -49,79 +50,100 @@ class ScheduleReceiver : BroadcastReceiver() {
             TAG, "onReceive uid $uid, appName $appName packageName $packageName"
         )
 
-        if (packageName != null) {
-            val coroutineScope = CoroutineScope(Dispatchers.IO)
-            coroutineScope.launch {
-                val appInfo = dao.getAppInfoByPackageName(packageName)
-                appInfo?.let {
-                    it.successfulScheduledCounter += 1
-                    dao.update(it)
-                }
-                Log.v(TAG, appInfo?.appName ?: "Not found")
-                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+        val serviceIntent = Intent(context, MyForegroundService::class.java)
+        serviceIntent.putExtra(
+            AppConstants.KEY_APP_NAME,
+            intent.getStringExtra(AppConstants.KEY_APP_NAME)
+        )
+        serviceIntent.putExtra(
+            AppConstants.KEY_PACKAGE_NAME,
+            intent.getStringExtra(AppConstants.KEY_PACKAGE_NAME)
+        )
+        serviceIntent.putExtra(
+            AppConstants.KEY_APP_UID,
+            intent.getIntExtra(AppConstants.KEY_APP_UID, -1)
+        )
+        serviceIntent.putExtra(
+            AppConstants.KEY_ALARM_HOUR,
+            intent.getIntExtra(AppConstants.KEY_ALARM_HOUR, 0)
+        )
+        serviceIntent.putExtra(
+            AppConstants.KEY_ALARM_MINUTE,
+            intent.getIntExtra(AppConstants.KEY_ALARM_MINUTE, 0)
+        )
 
-                val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
-                    intent.putExtra(AppConstants.KEY_APP_UID, uid)
-                    intent.putExtra(AppConstants.KEY_APP_NAME, appName)
-                    intent.putExtra(AppConstants.KEY_PACKAGE_NAME, packageName)
-
-                    intent.putExtra(AppConstants.KEY_ALARM_HOUR, hour)
-                    intent.putExtra(AppConstants.KEY_ALARM_MINUTE, minute)
-
-                    PendingIntent.getBroadcast(
-                        context,
-                        uid,
-                        intent,
-                        PendingIntent.FLAG_CANCEL_CURRENT
-                    )
-                }
-
-                if (alarmIntent != null && alarmManager != null) {
-                    alarmManager.cancel(alarmIntent)
-                }
-
-                val calendar: Calendar = Calendar.getInstance().apply {
-                    timeInMillis = System.currentTimeMillis()
-
-                    set(Calendar.HOUR_OF_DAY, hour)
-                    set(Calendar.MINUTE, minute)
-                }
-
-                calendar.add(Calendar.DAY_OF_MONTH, 1)
-
-                // to schedule in exact time
-                alarmManager?.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    alarmIntent
-                )
-            }
-//            val appInfo = dao.getAppInfoById(packageName)
-            val pm = context.packageManager
-            if (pm != null) {
-                val fireIntent = pm.getLaunchIntentForPackage(packageName)
-                if (fireIntent != null) {
-                    fireIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    context.startActivity(fireIntent)
-                }
-            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent)
+        } else {
+            context.startService(serviceIntent)
         }
+
+//        if (packageName != null) {
+//            val coroutineScope = CoroutineScope(Dispatchers.IO)
+//            coroutineScope.launch {
+////                val database = AppDatabase.getInstance(context)
+////                if (!::dao.isInitialized) {
+////                    dao = database.treeDao()
+////                }
+//                val appInfo = dao.getAppInfoByPackageName(packageName)
+//                appInfo?.let {
+//                    it.successfulScheduledCounter += 1
+//                    dao.update(it)
+//                }
+//                Log.v(TAG, appInfo?.appName ?: "Not found")
+//                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+//
+//                val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
+//                    intent.putExtra(AppConstants.KEY_APP_UID, uid)
+//                    intent.putExtra(AppConstants.KEY_APP_NAME, appName)
+//                    intent.putExtra(AppConstants.KEY_PACKAGE_NAME, packageName)
+//
+//                    intent.putExtra(AppConstants.KEY_ALARM_HOUR, hour)
+//                    intent.putExtra(AppConstants.KEY_ALARM_MINUTE, minute)
+//
+//                    PendingIntent.getBroadcast(
+//                        context, uid, intent, PendingIntent.FLAG_CANCEL_CURRENT
+//                    )
+//                }
+//
+//                if (alarmIntent != null && alarmManager != null) {
+//                    alarmManager.cancel(alarmIntent)
+//                }
+//
+//                val calendar: Calendar = Calendar.getInstance().apply {
+//                    timeInMillis = System.currentTimeMillis()
+//
+//                    set(Calendar.HOUR_OF_DAY, hour)
+//                    set(Calendar.MINUTE, minute)
+//                }
+//
+//                calendar.add(Calendar.DAY_OF_MONTH, 1)
+//
+//                // to schedule in exact time
+//                alarmManager?.setExact(
+//                    AlarmManager.RTC_WAKEUP, calendar.timeInMillis, alarmIntent
+//                )
+//            }
+////            val appInfo = dao.getAppInfoById(packageName)
+//            val pm = context.packageManager
+//            if (pm != null) {
+//                val launchIntent = pm.getLaunchIntentForPackage("com.makinu.app.scheduler")
+//                if (launchIntent != null) {
+//                    launchIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+//                    launchIntent.putExtra("some_data", "value");
+//                    context.startActivity(launchIntent)
+//                }
+//            }
+//        }
 
         createNotificationChannel(context)
         generateNotification(context, uid, appName, packageName)
-
-        // Todo, need few more time finish the following task
-        // need to access the database to get the scheduled time and status
-        // to re activate the schedule the app if we don't use interval facility
     }
 
     private val CHANNEL_ID = "CHANNEL_ID"
 
     private fun generateNotification(
-        context: Context,
-        uid: Int,
-        appName: String?,
-        packageName: String?
+        context: Context, uid: Int, appName: String?, packageName: String?
     ) {
         // Create an explicit intent for an Activity in your app
 
@@ -134,27 +156,20 @@ class ScheduleReceiver : BroadcastReceiver() {
                     PendingIntent.getActivity(context, uid, fireIntent, PendingIntent.FLAG_ONE_SHOT)
 
                 val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle(appName)
-                    .setContentText(packageName)
-                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setSmallIcon(R.mipmap.ic_launcher).setContentTitle(appName)
+                    .setContentText(packageName).setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     // Set the intent that will fire when the user taps the notification
-                    .setContentIntent(pendingIntent)
-                    .setAutoCancel(true)
+                    .setContentIntent(pendingIntent).setAutoCancel(true)
 
                 with(NotificationManagerCompat.from(context)) {
                     // notificationId is a unique int for each notification that you must define
                     if (ActivityCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.POST_NOTIFICATIONS
+                            context, Manifest.permission.POST_NOTIFICATIONS
                         ) != PackageManager.PERMISSION_GRANTED
                     ) {
                         Toast.makeText(
-                            context,
-                            "Need notification post permission",
-                            Toast.LENGTH_LONG
-                        )
-                            .show()
+                            context, "Need notification post permission", Toast.LENGTH_LONG
+                        ).show()
                         return
                     }
                     notify(uid, builder.build())

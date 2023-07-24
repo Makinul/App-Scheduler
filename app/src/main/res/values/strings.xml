@@ -27,4 +27,6 @@
     <string name="channel_name">Channel Name</string>
     <string name="channel_description">Channel Description</string>
     <string name="send_message">Send Message</string>
+    <string name="please_allow_permission">Please allow permission!</string>
+    <string name="you_need_allow_overlay_permission_to_open_apps">You need allow overlay permission to open apps from background, please select \"%s\" and enable the permission</string>
 </resources>

@@ -4,9 +4,11 @@ import android.app.AlarmManager
 import android.app.Dialog
 import android.app.PendingIntent
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.net.Uri
 import android.os.*
 import android.view.LayoutInflater
 import android.view.View
@@ -22,11 +24,13 @@ import com.makinu.app.scheduler.data.Status
 import com.makinu.app.scheduler.data.model.AppUiInfo
 import com.makinu.app.scheduler.databinding.DialogAppScheduleDetailsBinding
 import com.makinu.app.scheduler.databinding.FragmentHomeBinding
-import com.makinu.app.scheduler.utils.ScheduleReceiver
 import com.makinu.app.scheduler.utils.AppConstants
+import com.makinu.app.scheduler.utils.ScheduleReceiver
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.*
-import kotlin.collections.ArrayList
+import android.provider.Settings
+import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AlertDialog
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -57,17 +61,13 @@ class HomeFragment : BaseFragment() {
     private fun prepareRecyclerView() {
         adapter = AppInfoAdapter(items, object : AppInfoAdapter.OnClickListener {
             override fun clickOnView(position: Int, item: AppUiInfo) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (!Settings.canDrawOverlays(context)) {
+                        overlayPermissionDialog()
+                        return
+                    }
+                }
                 showAppScheduleDialog(position, item)
-
-//                val launcherApps =
-//                    context!!.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
-//
-//                launcherApps.startMainActivity(
-//                    item.componentName,
-//                    item.userHandle,
-//                    item.rect,
-//                    null
-//                )
             }
         })
 
@@ -75,6 +75,26 @@ class HomeFragment : BaseFragment() {
             layoutManager = LinearLayoutManager(requireActivity(), VERTICAL, false)
             adapter = this@HomeFragment.adapter
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.M)
+    private fun overlayPermissionDialog() {
+        val alertDialog = AlertDialog.Builder(requireContext())
+            .setTitle(R.string.please_allow_permission)
+            .setMessage(
+                getString(
+                    R.string.you_need_allow_overlay_permission_to_open_apps,
+                    getString(R.string.app_name)
+                )
+            )
+            .setPositiveButton(R.string.ok) { _: DialogInterface?, _: Int ->
+                val myIntent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                myIntent.data = Uri.parse("package:" + context?.packageName)
+                startActivity(myIntent)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+        alertDialog.show()
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -162,9 +182,7 @@ class HomeFragment : BaseFragment() {
 
         // to schedule in exact time
         alarmManager?.setExact(
-            AlarmManager.RTC_WAKEUP,
-            calendar.timeInMillis,
-            alarmIntent
+            AlarmManager.RTC_WAKEUP, calendar.timeInMillis, alarmIntent
         )
     }
 
