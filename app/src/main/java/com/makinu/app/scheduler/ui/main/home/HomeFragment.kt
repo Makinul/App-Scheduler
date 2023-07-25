@@ -3,6 +3,7 @@ package com.makinu.app.scheduler.ui.main.home
 import android.app.AlarmManager
 import android.app.Dialog
 import android.app.PendingIntent
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
@@ -10,10 +11,15 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.*
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
+import android.widget.TimePicker
+import android.widget.TimePicker.OnTimeChangedListener
+import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -22,17 +28,13 @@ import com.makinu.app.scheduler.R
 import com.makinu.app.scheduler.base.BaseFragment
 import com.makinu.app.scheduler.data.Status
 import com.makinu.app.scheduler.data.model.AppUiInfo
+import com.makinu.app.scheduler.data.model.Scheduler
 import com.makinu.app.scheduler.databinding.DialogAppScheduleDetailsBinding
 import com.makinu.app.scheduler.databinding.FragmentHomeBinding
 import com.makinu.app.scheduler.utils.AppConstants
 import com.makinu.app.scheduler.utils.ScheduleReceiver
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.*
-import android.provider.Settings
-import androidx.annotation.RequiresApi
-import androidx.appcompat.app.AlertDialog
-import com.makinu.app.scheduler.data.model.Scheduler
-import kotlin.collections.ArrayList
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -218,31 +220,16 @@ class HomeFragment : BaseFragment() {
         val schedulerAdapter =
             ScheduleAdapter(schedulers, object : ScheduleAdapter.OnClickListener {
                 override fun clickOnView(position: Int, isSelected: Boolean, item: Scheduler) {
-                    if (isSelected) {
-                        dBinding.timePicker.visibility = View.VISIBLE
-                    } else {
-                        dBinding.timePicker.visibility = View.GONE
-                    }
+
                 }
 
                 override fun onSaveScheduler(position: Int, isSelected: Boolean, item: Scheduler) {
-                    if (isSelected) {
-                        item.isScheduled = false
-                        val hour: Int
-                        val minute: Int
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            hour = dBinding.timePicker.hour
-                            minute = dBinding.timePicker.minute
-                        } else {
-                            hour = dBinding.timePicker.currentHour
-                            minute = dBinding.timePicker.currentMinute
-                        }
-                        prepareSchedulerToSave(hour, minute, item)
-                    }
+
                 }
 
                 override fun onDeleteScheduler(position: Int, item: Scheduler) {
-
+                    viewModel.deleteScheduler(item)
+                    schedulers.removeAt(position)
                 }
             })
 
@@ -268,8 +255,30 @@ class HomeFragment : BaseFragment() {
         viewModel.getSchedulers(appInfo)
 
         dBinding.add.setOnClickListener {
-            schedulers.add(Scheduler(0, appInfo.packageName, appInfo.uid))
-            schedulerAdapter.notifyItemInserted(schedulers.size - 1)
+            val currentTime = Calendar.getInstance()
+            val currentHour = currentTime[Calendar.HOUR_OF_DAY]
+            val currentMin = currentTime[Calendar.MINUTE]
+
+            val timePickerDialog =
+                TimePickerDialog(
+                    context, { view, hourOfDay, minute ->
+                        val scheduler = Scheduler()
+                        scheduler.isScheduled = false
+                        scheduler.scheduleTime = "$hourOfDay:$minute"
+                        scheduler.scheduleRunning = true
+                        scheduler.uid = appInfo.uid
+                        scheduler.packageName = appInfo.packageName
+                        schedulers.add(scheduler)
+                        schedulerAdapter.notifyItemInserted(schedulers.size - 1)
+
+                        viewModel.setScheduler(scheduler)
+                    },
+                    currentHour,
+                    currentMin,
+                    true
+                )
+            timePickerDialog.setTitle("Select Time");
+            timePickerDialog.show();
         }
 
         dBinding.okButton.setOnClickListener {

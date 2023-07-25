@@ -44,6 +44,11 @@ class HomeViewModel @Inject constructor(
         Log.v("setScheduler", item.toString())
     }
 
+    fun deleteScheduler(scheduler: Scheduler) = viewModelScope.launch(Dispatchers.IO) {
+        val item = schedulerDao.delete(scheduler)
+        Log.v("setScheduler", item.toString())
+    }
+
     fun setAlarm(appUiInfo: AppUiInfo) = viewModelScope.launch(Dispatchers.IO) {
         var appInfo = appDao.getAppInfoByPackageName(appUiInfo.packageName)
         if (appInfo == null) {
