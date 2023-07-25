@@ -63,7 +63,7 @@ class HomeFragment : BaseFragment() {
             override fun clickOnView(position: Int, item: AppUiInfo) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     if (!Settings.canDrawOverlays(context)) {
-                        overlayPermissionDialog()
+                        showOverlayPermissionDialog()
                         return
                     }
                 }
@@ -78,7 +78,7 @@ class HomeFragment : BaseFragment() {
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
-    private fun overlayPermissionDialog() {
+    private fun showOverlayPermissionDialog() {
         val alertDialog = AlertDialog.Builder(requireContext())
             .setTitle(R.string.please_allow_permission)
             .setMessage(
@@ -159,17 +159,12 @@ class HomeFragment : BaseFragment() {
             alarmManager.cancel(alarmIntent)
         }
 
-//        alarmManager?.set(
-//            AlarmManager.ELAPSED_REALTIME_WAKEUP,
-//            SystemClock.elapsedRealtime() + 60 * 1000,
-//            alarmIntent
-//        )
-
         val calendar: Calendar = Calendar.getInstance().apply {
             timeInMillis = System.currentTimeMillis()
 
             set(Calendar.HOUR_OF_DAY, hour)
             set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
         }
 
         // it trigger approximate time
@@ -177,6 +172,15 @@ class HomeFragment : BaseFragment() {
 //            AlarmManager.RTC_WAKEUP,
 //            calendar.timeInMillis,
 //            AlarmManager.INTERVAL_DAY,
+//            alarmIntent
+//        )
+//
+//        val elapsedTime = SystemClock.elapsedRealtime()
+//        val calendarTime = calendar.timeInMillis
+//
+//        alarmManager?.set(
+//            AlarmManager.RTC_WAKEUP,
+//            calendarTime,
 //            alarmIntent
 //        )
 

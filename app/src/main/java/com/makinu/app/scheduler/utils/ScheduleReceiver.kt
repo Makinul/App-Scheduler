@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
@@ -42,9 +43,55 @@ class ScheduleReceiver : BroadcastReceiver() {
         val hour = intent.getIntExtra(AppConstants.KEY_ALARM_HOUR, 0)
         val minute = intent.getIntExtra(AppConstants.KEY_ALARM_MINUTE, 0)
 
-//        val localService = Intent(context, LocalService::class.java)
-//        ContextCompat.startForegroundService(context, localService)
-//        context.startService(localService)
+        // to schedule current task again
+        if (packageName != null) {
+            val coroutineScope = CoroutineScope(Dispatchers.IO)
+            coroutineScope.launch {
+                if (!::dao.isInitialized) {
+                    val database = AppDatabase.getInstance(context)
+                    dao = database.treeDao()
+                }
+                val appInfo = dao.getAppInfoByPackageName(packageName)
+                appInfo?.let {
+                    it.successfulScheduledCounter += 1
+                    dao.update(it)
+                }
+                Log.v(TAG, appInfo?.appName ?: "Not found")
+                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+
+                val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
+                    intent.putExtra(AppConstants.KEY_APP_UID, uid)
+                    intent.putExtra(AppConstants.KEY_APP_NAME, appName)
+                    intent.putExtra(AppConstants.KEY_PACKAGE_NAME, packageName)
+
+                    intent.putExtra(AppConstants.KEY_ALARM_HOUR, hour)
+                    intent.putExtra(AppConstants.KEY_ALARM_MINUTE, minute)
+
+                    PendingIntent.getBroadcast(
+                        context, uid, intent, PendingIntent.FLAG_CANCEL_CURRENT
+                    )
+                }
+
+                if (alarmIntent != null && alarmManager != null) {
+                    alarmManager.cancel(alarmIntent)
+                }
+
+                val calendar: Calendar = Calendar.getInstance().apply {
+                    timeInMillis = System.currentTimeMillis()
+
+                    set(Calendar.HOUR_OF_DAY, hour)
+                    set(Calendar.MINUTE, minute)
+                    set(Calendar.SECOND, 0)
+                }
+
+                calendar.add(Calendar.DAY_OF_MONTH, 1)
+
+                // to schedule in exact time
+                alarmManager?.setExact(
+                    AlarmManager.RTC_WAKEUP, calendar.timeInMillis, alarmIntent
+                )
+            }
+        }
 
         Log.v(
             TAG, "onReceive uid $uid, appName $appName packageName $packageName"
@@ -72,82 +119,27 @@ class ScheduleReceiver : BroadcastReceiver() {
             intent.getIntExtra(AppConstants.KEY_ALARM_MINUTE, 0)
         )
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(context)) {
+                createNotificationChannel(context)
+                generateNotification(context, uid, appName, packageName)
+                return
+            }
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(serviceIntent)
         } else {
             context.startService(serviceIntent)
         }
-
-//        if (packageName != null) {
-//            val coroutineScope = CoroutineScope(Dispatchers.IO)
-//            coroutineScope.launch {
-////                val database = AppDatabase.getInstance(context)
-////                if (!::dao.isInitialized) {
-////                    dao = database.treeDao()
-////                }
-//                val appInfo = dao.getAppInfoByPackageName(packageName)
-//                appInfo?.let {
-//                    it.successfulScheduledCounter += 1
-//                    dao.update(it)
-//                }
-//                Log.v(TAG, appInfo?.appName ?: "Not found")
-//                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-//
-//                val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
-//                    intent.putExtra(AppConstants.KEY_APP_UID, uid)
-//                    intent.putExtra(AppConstants.KEY_APP_NAME, appName)
-//                    intent.putExtra(AppConstants.KEY_PACKAGE_NAME, packageName)
-//
-//                    intent.putExtra(AppConstants.KEY_ALARM_HOUR, hour)
-//                    intent.putExtra(AppConstants.KEY_ALARM_MINUTE, minute)
-//
-//                    PendingIntent.getBroadcast(
-//                        context, uid, intent, PendingIntent.FLAG_CANCEL_CURRENT
-//                    )
-//                }
-//
-//                if (alarmIntent != null && alarmManager != null) {
-//                    alarmManager.cancel(alarmIntent)
-//                }
-//
-//                val calendar: Calendar = Calendar.getInstance().apply {
-//                    timeInMillis = System.currentTimeMillis()
-//
-//                    set(Calendar.HOUR_OF_DAY, hour)
-//                    set(Calendar.MINUTE, minute)
-//                }
-//
-//                calendar.add(Calendar.DAY_OF_MONTH, 1)
-//
-//                // to schedule in exact time
-//                alarmManager?.setExact(
-//                    AlarmManager.RTC_WAKEUP, calendar.timeInMillis, alarmIntent
-//                )
-//            }
-////            val appInfo = dao.getAppInfoById(packageName)
-//            val pm = context.packageManager
-//            if (pm != null) {
-//                val launchIntent = pm.getLaunchIntentForPackage("com.makinu.app.scheduler")
-//                if (launchIntent != null) {
-//                    launchIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-//                    launchIntent.putExtra("some_data", "value");
-//                    context.startActivity(launchIntent)
-//                }
-//            }
-//        }
-
-        createNotificationChannel(context)
-        generateNotification(context, uid, appName, packageName)
     }
 
-    private val CHANNEL_ID = "CHANNEL_ID"
+    private val appOpeningChannelId = "appOpeningChannelId"
 
     private fun generateNotification(
         context: Context, uid: Int, appName: String?, packageName: String?
     ) {
         // Create an explicit intent for an Activity in your app
-
-
         if (packageName != null) {
             val pm = context.packageManager
             if (pm != null) {
@@ -155,7 +147,7 @@ class ScheduleReceiver : BroadcastReceiver() {
                 val pendingIntent: PendingIntent =
                     PendingIntent.getActivity(context, uid, fireIntent, PendingIntent.FLAG_ONE_SHOT)
 
-                val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+                val builder = NotificationCompat.Builder(context, appOpeningChannelId)
                     .setSmallIcon(R.mipmap.ic_launcher).setContentTitle(appName)
                     .setContentText(packageName).setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     // Set the intent that will fire when the user taps the notification
@@ -168,7 +160,9 @@ class ScheduleReceiver : BroadcastReceiver() {
                         ) != PackageManager.PERMISSION_GRANTED
                     ) {
                         Toast.makeText(
-                            context, "Need notification post permission", Toast.LENGTH_LONG
+                            context,
+                            "Need notification permission to view which app will going to open",
+                            Toast.LENGTH_LONG
                         ).show()
                         return
                     }
@@ -183,10 +177,11 @@ class ScheduleReceiver : BroadcastReceiver() {
         // Create the NotificationChannel, but only on API 26+ because
         // the NotificationChannel class is new and not in the support library
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = context.getString(R.string.channel_name)
-            val descriptionText = context.getString(R.string.channel_description)
+            val channelName = "To view the app open state"
+            val descriptionText =
+                "Need notification permission to view which app will going to open"
             val importance = NotificationManager.IMPORTANCE_DEFAULT
-            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
+            val channel = NotificationChannel(appOpeningChannelId, channelName, importance).apply {
                 description = descriptionText
             }
             // Register the channel with the system

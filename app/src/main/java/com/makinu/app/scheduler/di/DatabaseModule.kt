@@ -19,6 +19,7 @@ package com.makinu.app.scheduler.di
 import android.content.Context
 import com.makinu.app.scheduler.data.local.db.AppDatabase
 import com.makinu.app.scheduler.data.local.db.AppInfoDao
+import com.makinu.app.scheduler.data.local.db.SchedulerDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -39,5 +40,10 @@ class DatabaseModule {
     @Provides
     fun provideTreeDao(appDatabase: AppDatabase): AppInfoDao {
         return appDatabase.treeDao()
+    }
+
+    @Provides
+    fun provideSchedulerDao(appDatabase: AppDatabase): SchedulerDao {
+        return appDatabase.scheduleDao()
     }
 }

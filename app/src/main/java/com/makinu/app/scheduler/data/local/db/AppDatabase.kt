@@ -5,12 +5,14 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.makinu.app.scheduler.data.model.AppInfo
+import com.makinu.app.scheduler.data.model.Scheduler
 
 @Database(
-    entities = [AppInfo::class], version = 1
+    entities = [AppInfo::class, Scheduler::class], version = 2
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun treeDao(): AppInfoDao
+    abstract fun scheduleDao(): SchedulerDao
 
     companion object {
         @Volatile
