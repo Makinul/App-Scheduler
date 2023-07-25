@@ -1,7 +1,6 @@
 package com.makinu.app.scheduler.data.local.db
 
 import androidx.room.*
-import com.makinu.app.scheduler.data.model.AppInfo
 import com.makinu.app.scheduler.data.model.Scheduler
 import kotlinx.coroutines.flow.Flow
 
@@ -11,7 +10,7 @@ interface SchedulerDao {
     fun getAll(): List<Scheduler>
 
     @Query("SELECT * FROM scheduler WHERE packageName = :packageName")
-    fun getSchedulersByPackageName(packageName: String): List<AppInfo>
+    fun getSchedulersByPackageName(packageName: String): List<Scheduler>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(item: Scheduler)
@@ -34,6 +33,6 @@ interface SchedulerDao {
     @Query("DELETE FROM scheduler")
     suspend fun deleteAll()
 
-    @Query("SELECT * FROM appinfo")
-    fun getAllAppStatus(): Flow<List<AppInfo>>
+    @Query("SELECT * FROM scheduler")
+    fun getAllSchedulers(): Flow<List<Scheduler>>
 }

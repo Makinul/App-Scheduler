@@ -5,10 +5,11 @@ import androidx.room.PrimaryKey
 
 @Entity
 data class Scheduler(
-    @PrimaryKey(autoGenerate = true) var id: Int,
+    @PrimaryKey(autoGenerate = true) var id: Int = 0,
     var packageName: String = "",
     var uid: Int = -1,
     var scheduleTime: String? = null,
+    var scheduleRunning: Boolean = false,
     var isScheduled: Boolean = false
 ) {
     override fun toString(): String {

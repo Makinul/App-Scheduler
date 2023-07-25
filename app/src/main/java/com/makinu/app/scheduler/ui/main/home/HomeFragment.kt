@@ -31,6 +31,8 @@ import java.util.*
 import android.provider.Settings
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
+import com.makinu.app.scheduler.data.model.Scheduler
+import kotlin.collections.ArrayList
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -79,21 +81,18 @@ class HomeFragment : BaseFragment() {
 
     @RequiresApi(Build.VERSION_CODES.M)
     private fun showOverlayPermissionDialog() {
-        val alertDialog = AlertDialog.Builder(requireContext())
-            .setTitle(R.string.please_allow_permission)
-            .setMessage(
-                getString(
-                    R.string.you_need_allow_overlay_permission_to_open_apps,
-                    getString(R.string.app_name)
-                )
-            )
-            .setPositiveButton(R.string.ok) { _: DialogInterface?, _: Int ->
-                val myIntent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                myIntent.data = Uri.parse("package:" + context?.packageName)
-                startActivity(myIntent)
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .create()
+        val alertDialog =
+            AlertDialog.Builder(requireContext()).setTitle(R.string.please_allow_permission)
+                .setMessage(
+                    getString(
+                        R.string.you_need_allow_overlay_permission_to_open_apps,
+                        getString(R.string.app_name)
+                    )
+                ).setPositiveButton(R.string.ok) { _: DialogInterface?, _: Int ->
+                    val myIntent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                    myIntent.data = Uri.parse("package:" + context?.packageName)
+                    startActivity(myIntent)
+                }.setNegativeButton(R.string.cancel, null).create()
         alertDialog.show()
     }
 
@@ -122,7 +121,7 @@ class HomeFragment : BaseFragment() {
                 }
             }
         }
-//        viewModel.getAppStatus()
+
         context?.let { viewModel.getLauncherApps(it) }
     }
 
@@ -190,21 +189,17 @@ class HomeFragment : BaseFragment() {
         )
     }
 
-    private lateinit var loginDialog: Dialog
-
     fun showAppScheduleDialog(position: Int, appInfo: AppUiInfo) {
-        if (!::loginDialog.isInitialized) {
-            loginDialog = Dialog(context!!)
-            loginDialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        }
+        val schedulerDialog = Dialog(context!!)
+        schedulerDialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
 
         val dBinding = DialogAppScheduleDetailsBinding.inflate(
             LayoutInflater.from(
                 activity
             )
         )
-        loginDialog.setContentView(dBinding.root)
-        val window = loginDialog.window
+        schedulerDialog.setContentView(dBinding.root)
+        val window = schedulerDialog.window
         if (window != null) {
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             window.setLayout(
@@ -212,98 +207,97 @@ class HomeFragment : BaseFragment() {
             )
         }
 
-        loginDialog.setCanceledOnTouchOutside(true)
-        if (!loginDialog.isShowing) loginDialog.show()
+        schedulerDialog.setCanceledOnTouchOutside(true)
+        if (!schedulerDialog.isShowing) schedulerDialog.show()
 
         dBinding.appName.text = appInfo.appName
         dBinding.packageName.text = appInfo.packageName
         dBinding.icon.setImageBitmap(appInfo.icon)
 
-        if (appInfo.isScheduled) {
-            dBinding.timePicker.visibility = View.VISIBLE
-
-            appInfo.scheduleTime?.let {
-                if (it.contains(":")) {
-                    val parts = it.split(":")
-                    if (parts.size > 1) {
-                        try {
-                            val hour = parts[0].toInt()
-                            val minute = parts[1].toInt()
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                dBinding.timePicker.hour = hour
-                                dBinding.timePicker.minute = minute
-                            } else {
-                                dBinding.timePicker.currentHour = hour
-                                dBinding.timePicker.currentMinute = minute
-                            }
-                        } catch (e: java.lang.NumberFormatException) {
-                            e.printStackTrace()
-                        }
+        val schedulers: ArrayList<Scheduler> = ArrayList()
+        val schedulerAdapter =
+            ScheduleAdapter(schedulers, object : ScheduleAdapter.OnClickListener {
+                override fun clickOnView(position: Int, isSelected: Boolean, item: Scheduler) {
+                    if (isSelected) {
+                        dBinding.timePicker.visibility = View.VISIBLE
+                    } else {
+                        dBinding.timePicker.visibility = View.GONE
                     }
                 }
-            }
-        } else {
-            dBinding.timePicker.visibility = View.GONE
-        }
-        dBinding.switchButton.isChecked = appInfo.isScheduled
 
-        dBinding.switchButton.setOnCheckedChangeListener { buttonView, isChecked ->
-            if (isChecked) {
-                dBinding.timePicker.visibility = View.VISIBLE
-            } else {
-                dBinding.timePicker.visibility = View.GONE
+                override fun onSaveScheduler(position: Int, isSelected: Boolean, item: Scheduler) {
+                    if (isSelected) {
+                        item.isScheduled = false
+                        val hour: Int
+                        val minute: Int
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            hour = dBinding.timePicker.hour
+                            minute = dBinding.timePicker.minute
+                        } else {
+                            hour = dBinding.timePicker.currentHour
+                            minute = dBinding.timePicker.currentMinute
+                        }
+                        prepareSchedulerToSave(hour, minute, item)
+                    }
+                }
+
+                override fun onDeleteScheduler(position: Int, item: Scheduler) {
+
+                }
+            })
+
+        dBinding.recyclerView.apply {
+            layoutManager = LinearLayoutManager(requireActivity(), VERTICAL, false)
+            adapter = schedulerAdapter
+        }
+
+        viewModel.schedulers.observe(viewLifecycleOwner) { event ->
+            event.peekContent().let {
+                if (it.status == Status.SUCCESS) {
+                    schedulers.clear()
+                    it.data?.let { list ->
+                        schedulers.addAll(list)
+                    }
+                    if (schedulers.isEmpty()) {
+                        schedulers.add(Scheduler(0, appInfo.packageName, appInfo.uid))
+                    }
+                    schedulerAdapter.notifyDataSetChanged()
+                }
             }
+        }
+        viewModel.getSchedulers(appInfo)
+
+        dBinding.add.setOnClickListener {
+            schedulers.add(Scheduler(0, appInfo.packageName, appInfo.uid))
+            schedulerAdapter.notifyItemInserted(schedulers.size - 1)
         }
 
         dBinding.okButton.setOnClickListener {
-            val hour: Int
-            val minute: Int
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                hour = dBinding.timePicker.hour
-                minute = dBinding.timePicker.minute
-            } else {
-                hour = dBinding.timePicker.currentHour
-                minute = dBinding.timePicker.currentMinute
-            }
-            appInfo.scheduleTime = if (hour > 9) {
-                "$hour"
-            } else {
-                "0$hour"
-            }
-            appInfo.scheduleTime += if (minute > 9) {
-                ":$minute"
-            } else {
-                ":0$minute"
-            }
-
-            // Todo, need few more time finish the following task
-            // we need to check here time conflicting issue
-            // while saving the data into database and set alarm
-
-            appInfo.isScheduled = dBinding.switchButton.isChecked
-            val message = if (appInfo.isScheduled) {
-                viewModel.setAlarm(appInfo)
-                setAlarm(appInfo, hour, minute)
-                getString(R.string.schedule_set_for, appInfo.appName)
-            } else {
-                viewModel.cancelAlarm(appInfo.packageName)
-                cancelAlarm(appInfo)
-                getString(R.string.schedule_cancel_for, appInfo.appName)
-            }
-            showToast(message)
-            loginDialog.dismiss()
-
-            items[position] = appInfo
-            adapter.notifyItemChanged(position, true)
+            schedulerDialog.dismiss()
         }
 
         dBinding.cancelButton.setOnClickListener {
-            loginDialog.dismiss()
+            schedulerDialog.dismiss()
         }
 
         dBinding.cross.setOnClickListener {
-            loginDialog.dismiss()
+            schedulerDialog.dismiss()
         }
+    }
+
+    private fun prepareSchedulerToSave(hour: Int, minute: Int, scheduler: Scheduler) {
+        scheduler.scheduleTime = if (hour > 9) {
+            "$hour"
+        } else {
+            "0$hour"
+        }
+        scheduler.scheduleTime += if (minute > 9) {
+            ":$minute"
+        } else {
+            ":0$minute"
+        }
+
+//        viewModel.setAlarm()
     }
 
     override fun onDestroyView() {
