@@ -14,7 +14,8 @@ data class AppUiInfo(
     val rect: Rect? = null,
     var icon: Bitmap? = null,
     var scheduleTime: String? = null,
-    var isScheduled: Boolean = false
+    var isScheduled: Boolean = false,
+    var scheduleCounter: Int = 0
 ) {
     override fun toString(): String {
         return appName

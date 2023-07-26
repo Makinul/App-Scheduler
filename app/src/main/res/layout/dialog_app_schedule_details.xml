@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="@dimen/default_margin"
@@ -21,7 +22,7 @@
         android:layout_width="@dimen/dialog_cross_button_height"
         android:layout_height="@dimen/dialog_cross_button_height"
         android:background="?android:attr/selectableItemBackground"
-        android:src="@drawable/ic_dialog_cross"
+        android:src="@drawable/ic_cross"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -45,41 +46,36 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/package_name" />
 
-    <LinearLayout
-        android:id="@+id/status_lay"
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/add"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:backgroundTint="@color/positive"
+        android:text="@string/add"
+        app:cornerRadius="@dimen/default_margin_small"
+        app:icon="@drawable/ic_add"
+        app:layout_constraintBottom_toBottomOf="@id/icon"
+        app:layout_constraintEnd_toEndOf="@id/recycler_view" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_view"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        app:layout_constraintTop_toBottomOf="@id/icon">
-
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/app_schedule"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/app_schedule_" />
-
-        <androidx.appcompat.widget.SwitchCompat
-            android:id="@+id/switch_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
-    </LinearLayout>
-
-    <TimePicker
-        android:id="@+id/time_picker"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:timePickerMode="spinner"
-        app:layout_constraintTop_toBottomOf="@id/status_lay" />
+        android:layout_margin="@dimen/default_margin_small"
+        android:background="@drawable/dialog_scheduler_bg"
+        app:layout_constraintTop_toBottomOf="@id/icon"
+        tools:itemCount="3"
+        tools:listitem="@layout/item_app_scheduler" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/ok_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/default_margin"
-        android:backgroundTint="@color/positive"
-        android:text="@string/ok"
+        android:backgroundTint="@color/done"
+        android:text="@string/done"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/time_picker" />
+        app:layout_constraintTop_toBottomOf="@id/recycler_view" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/cancel_button"
@@ -88,6 +84,7 @@
         android:layout_marginEnd="@dimen/default_margin"
         android:backgroundTint="@color/negative"
         android:text="@string/cancel"
-        app:layout_constraintEnd_toStartOf="@id/ok_button"
+        android:visibility="invisible"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@id/ok_button" />
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -10,6 +10,9 @@
     <color name="default_error">#D1655D</color>
     <color name="dialog_bg">#D4E4EB</color>
 
+    <color name="done">#2196F3</color>
     <color name="positive">#4CAF50</color>
     <color name="negative">#F44336</color>
+
+    <color name="scheduler_item_selected">#FFFFFF</color>
 </resources>

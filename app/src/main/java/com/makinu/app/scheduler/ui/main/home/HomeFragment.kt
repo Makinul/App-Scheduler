@@ -3,6 +3,7 @@ package com.makinu.app.scheduler.ui.main.home
 import android.app.AlarmManager
 import android.app.Dialog
 import android.app.PendingIntent
+import android.app.TimePickerDialog
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
@@ -10,10 +11,13 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.*
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
+import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -22,15 +26,13 @@ import com.makinu.app.scheduler.R
 import com.makinu.app.scheduler.base.BaseFragment
 import com.makinu.app.scheduler.data.Status
 import com.makinu.app.scheduler.data.model.AppUiInfo
+import com.makinu.app.scheduler.data.model.Scheduler
 import com.makinu.app.scheduler.databinding.DialogAppScheduleDetailsBinding
 import com.makinu.app.scheduler.databinding.FragmentHomeBinding
 import com.makinu.app.scheduler.utils.AppConstants
 import com.makinu.app.scheduler.utils.ScheduleReceiver
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.*
-import android.provider.Settings
-import androidx.annotation.RequiresApi
-import androidx.appcompat.app.AlertDialog
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
@@ -63,7 +65,7 @@ class HomeFragment : BaseFragment() {
             override fun clickOnView(position: Int, item: AppUiInfo) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     if (!Settings.canDrawOverlays(context)) {
-                        overlayPermissionDialog()
+                        showOverlayPermissionDialog()
                         return
                     }
                 }
@@ -78,22 +80,19 @@ class HomeFragment : BaseFragment() {
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
-    private fun overlayPermissionDialog() {
-        val alertDialog = AlertDialog.Builder(requireContext())
-            .setTitle(R.string.please_allow_permission)
-            .setMessage(
-                getString(
-                    R.string.you_need_allow_overlay_permission_to_open_apps,
-                    getString(R.string.app_name)
-                )
-            )
-            .setPositiveButton(R.string.ok) { _: DialogInterface?, _: Int ->
-                val myIntent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                myIntent.data = Uri.parse("package:" + context?.packageName)
-                startActivity(myIntent)
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .create()
+    private fun showOverlayPermissionDialog() {
+        val alertDialog =
+            AlertDialog.Builder(requireContext()).setTitle(R.string.please_allow_permission)
+                .setMessage(
+                    getString(
+                        R.string.you_need_allow_overlay_permission_to_open_apps,
+                        getString(R.string.app_name)
+                    )
+                ).setPositiveButton(R.string.ok) { _: DialogInterface?, _: Int ->
+                    val myIntent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                    myIntent.data = Uri.parse("package:" + context?.packageName)
+                    startActivity(myIntent)
+                }.setNegativeButton(R.string.cancel, null).create()
         alertDialog.show()
     }
 
@@ -122,7 +121,7 @@ class HomeFragment : BaseFragment() {
                 }
             }
         }
-//        viewModel.getAppStatus()
+
         context?.let { viewModel.getLauncherApps(it) }
     }
 
@@ -133,52 +132,32 @@ class HomeFragment : BaseFragment() {
         adapter.notifyDataSetChanged()
     }
 
-    private fun cancelAlarm(item: AppUiInfo) {
+    private fun cancelAlarm(item: Scheduler) {
         val alarmManager = context?.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
         val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
-            PendingIntent.getBroadcast(context, item.uid, intent, PendingIntent.FLAG_CANCEL_CURRENT)
+            PendingIntent.getBroadcast(context, item.id, intent, PendingIntent.FLAG_CANCEL_CURRENT)
         }
         if (alarmIntent != null && alarmManager != null) {
             alarmManager.cancel(alarmIntent)
         }
     }
 
-    private fun setAlarm(item: AppUiInfo, hour: Int, minute: Int) {
+    private fun setAlarm(item: Scheduler, calendar: Calendar) {
         val alarmManager = context?.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
         val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
+            intent.putExtra(AppConstants.KEY_SCHEDULER_ID, item.id)
             intent.putExtra(AppConstants.KEY_APP_UID, item.uid)
             intent.putExtra(AppConstants.KEY_APP_NAME, item.appName)
             intent.putExtra(AppConstants.KEY_PACKAGE_NAME, item.packageName)
 
-            intent.putExtra(AppConstants.KEY_ALARM_HOUR, hour)
-            intent.putExtra(AppConstants.KEY_ALARM_MINUTE, minute)
+            intent.putExtra(AppConstants.KEY_ALARM_HOUR, calendar.get(Calendar.HOUR_OF_DAY))
+            intent.putExtra(AppConstants.KEY_ALARM_MINUTE, calendar.get(Calendar.MINUTE))
 
-            PendingIntent.getBroadcast(context, item.uid, intent, PendingIntent.FLAG_CANCEL_CURRENT)
+            PendingIntent.getBroadcast(context, item.id, intent, PendingIntent.FLAG_CANCEL_CURRENT)
         }
         if (alarmIntent != null && alarmManager != null) {
             alarmManager.cancel(alarmIntent)
         }
-
-//        alarmManager?.set(
-//            AlarmManager.ELAPSED_REALTIME_WAKEUP,
-//            SystemClock.elapsedRealtime() + 60 * 1000,
-//            alarmIntent
-//        )
-
-        val calendar: Calendar = Calendar.getInstance().apply {
-            timeInMillis = System.currentTimeMillis()
-
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-        }
-
-        // it trigger approximate time
-//        alarmManager?.setInexactRepeating(
-//            AlarmManager.RTC_WAKEUP,
-//            calendar.timeInMillis,
-//            AlarmManager.INTERVAL_DAY,
-//            alarmIntent
-//        )
 
         // to schedule in exact time
         alarmManager?.setExact(
@@ -186,21 +165,19 @@ class HomeFragment : BaseFragment() {
         )
     }
 
-    private lateinit var loginDialog: Dialog
+    private var schedulerAdapter: ScheduleAdapter? = null
 
     fun showAppScheduleDialog(position: Int, appInfo: AppUiInfo) {
-        if (!::loginDialog.isInitialized) {
-            loginDialog = Dialog(context!!)
-            loginDialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        }
+        val schedulerDialog = Dialog(context!!)
+        schedulerDialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
 
         val dBinding = DialogAppScheduleDetailsBinding.inflate(
             LayoutInflater.from(
                 activity
             )
         )
-        loginDialog.setContentView(dBinding.root)
-        val window = loginDialog.window
+        schedulerDialog.setContentView(dBinding.root)
+        val window = schedulerDialog.window
         if (window != null) {
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             window.setLayout(
@@ -208,98 +185,232 @@ class HomeFragment : BaseFragment() {
             )
         }
 
-        loginDialog.setCanceledOnTouchOutside(true)
-        if (!loginDialog.isShowing) loginDialog.show()
+        schedulerDialog.setCanceledOnTouchOutside(true)
+        if (!schedulerDialog.isShowing) schedulerDialog.show()
 
         dBinding.appName.text = appInfo.appName
         dBinding.packageName.text = appInfo.packageName
         dBinding.icon.setImageBitmap(appInfo.icon)
 
-        if (appInfo.isScheduled) {
-            dBinding.timePicker.visibility = View.VISIBLE
+        val schedulers: ArrayList<Scheduler> = ArrayList()
+        schedulerAdapter = ScheduleAdapter(schedulers, object : ScheduleAdapter.OnClickListener {
+            override fun clickOnView(position: Int, isSelected: Boolean, item: Scheduler) {
+                val currentTime = AppConstants.timeToCalendar(item.scheduleTime)
+                val currentHour = currentTime[Calendar.HOUR_OF_DAY]
+                val currentMin = currentTime[Calendar.MINUTE]
 
-            appInfo.scheduleTime?.let {
-                if (it.contains(":")) {
-                    val parts = it.split(":")
-                    if (parts.size > 1) {
-                        try {
-                            val hour = parts[0].toInt()
-                            val minute = parts[1].toInt()
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                dBinding.timePicker.hour = hour
-                                dBinding.timePicker.minute = minute
-                            } else {
-                                dBinding.timePicker.currentHour = hour
-                                dBinding.timePicker.currentMinute = minute
+                val timePickerDialog =
+                    TimePickerDialog(
+                        context, { view, hourOfDay, minute ->
+                            val currentTimeAgain = Calendar.getInstance()
+                            currentTimeAgain.set(Calendar.SECOND, 0)
+
+                            val setTime = Calendar.getInstance()
+                            setTime.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                            setTime.set(Calendar.MINUTE, minute)
+                            setTime.set(Calendar.SECOND, 0)
+
+                            if (setTime.timeInMillis < currentTimeAgain.timeInMillis) {
+                                setTime.add(Calendar.DAY_OF_MONTH, 1)
                             }
-                        } catch (e: java.lang.NumberFormatException) {
-                            e.printStackTrace()
+
+                            val scheduler = Scheduler()
+                            scheduler.isScheduled = false
+
+                            scheduler.scheduleTime = "$hourOfDay:$minute"
+                            scheduler.scheduleRunning = item.scheduleRunning
+                            scheduler.uid = item.uid
+                            scheduler.appName = appInfo.appName
+                            scheduler.packageName = appInfo.packageName
+
+                            viewModel.schedulerId.observe(viewLifecycleOwner) { event ->
+                                event.getContentIfNotHandled()?.let {
+                                    val id: Int = (it.data ?: 0).toInt()
+                                    if (it.status == Status.ERROR || id == 0) {
+                                        val message =
+                                            it.message ?: "Unknown error, please try again"
+                                        showSimpleDialog(message)
+                                        return@observe
+                                    }
+
+                                    scheduler.id = id
+                                    schedulers[position] = scheduler
+
+                                    setAlarm(
+                                        scheduler,
+                                        calendar = setTime
+                                    )
+                                    schedulerAdapter?.notifyItemChanged(position)
+                                }
+                            }
+                            viewModel.updateScheduler(scheduler)
+                        },
+                        currentHour,
+                        currentMin,
+                        true
+                    )
+                timePickerDialog.setTitle(R.string.app_schedule_title)
+                timePickerDialog.show()
+            }
+
+            override fun onSaveScheduler(position: Int, isSelected: Boolean, item: Scheduler) {
+                item.scheduleRunning = isSelected
+                schedulers[position] = item
+
+                schedulerAdapter?.notifyItemChanged(position)
+                viewModel.updateScheduler(item)
+
+                val currentTimeAgain = Calendar.getInstance()
+                currentTimeAgain.set(Calendar.SECOND, 0)
+
+                val setTime = AppConstants.timeToCalendar(item.scheduleTime)
+
+                if (setTime.timeInMillis < currentTimeAgain.timeInMillis) {
+                    setTime.add(Calendar.DAY_OF_MONTH, 1)
+                }
+
+                if (isSelected) {
+                    setAlarm(
+                        item,
+                        calendar = setTime
+                    )
+                } else {
+                    cancelAlarm(item)
+                }
+            }
+
+            override fun onDeleteScheduler(position: Int, item: Scheduler) {
+                schedulers.removeAt(position)
+                schedulerAdapter?.notifyItemRemoved(position)
+                viewModel.deleteScheduler(item)
+
+                cancelAlarm(item)
+            }
+        })
+
+        dBinding.recyclerView.apply {
+            layoutManager = LinearLayoutManager(requireActivity(), VERTICAL, false)
+            adapter = schedulerAdapter
+        }
+
+        viewModel.schedulers.observe(viewLifecycleOwner) { event ->
+            event.peekContent().let {
+                if (it.status == Status.SUCCESS) {
+                    schedulers.clear()
+                    it.data?.let { list ->
+                        schedulers.addAll(list)
+                    }
+                    schedulerAdapter?.notifyDataSetChanged()
+                }
+            }
+        }
+        viewModel.getSchedulers(appInfo)
+
+        dBinding.add.setOnClickListener {
+            val currentTime = Calendar.getInstance()
+            val currentHour = currentTime[Calendar.HOUR_OF_DAY]
+            val currentMin = currentTime[Calendar.MINUTE]
+
+            val timePickerDialog =
+                TimePickerDialog(
+                    context, { view, hourOfDay, minute ->
+                        val currentTimeAgain = Calendar.getInstance()
+                        currentTimeAgain.set(Calendar.SECOND, 0)
+
+                        val setTime = Calendar.getInstance()
+                        setTime.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                        setTime.set(Calendar.MINUTE, minute)
+                        setTime.set(Calendar.SECOND, 0)
+
+                        if (setTime.timeInMillis < currentTimeAgain.timeInMillis) {
+                            setTime.add(Calendar.DAY_OF_MONTH, 1)
+                        }
+
+                        val scheduler = Scheduler()
+                        scheduler.isScheduled = false
+                        scheduler.scheduleTime = "$hourOfDay:$minute"
+                        scheduler.scheduleRunning = true
+                        scheduler.uid = appInfo.uid
+                        scheduler.appName = appInfo.appName
+                        scheduler.packageName = appInfo.packageName
+
+                        viewModel.schedulerId.observe(viewLifecycleOwner) { event ->
+                            event.getContentIfNotHandled()?.let {
+                                val id: Int = (it.data ?: 0).toInt()
+                                if (it.status == Status.ERROR || id == 0) {
+                                    val message = it.message ?: "Unknown error, please try again"
+                                    showSimpleDialog(message)
+                                    return@observe
+                                }
+
+                                scheduler.id = id
+                                schedulers.add(scheduler)
+
+                                setAlarm(
+                                    scheduler,
+                                    calendar = setTime
+                                )
+                                schedulerAdapter?.notifyItemInserted(schedulers.size - 1)
+                            }
+                        }
+                        viewModel.insertScheduler(scheduler)
+                    },
+                    currentHour,
+                    currentMin,
+                    true
+                )
+            timePickerDialog.setTitle(R.string.app_schedule_title)
+            timePickerDialog.show()
+        }
+
+        dBinding.okButton.setOnClickListener {
+            schedulerDialog.dismiss()
+        }
+
+        dBinding.cancelButton.setOnClickListener {
+            schedulerDialog.dismiss()
+        }
+
+        dBinding.cross.setOnClickListener {
+            schedulerDialog.dismiss()
+        }
+
+        schedulerDialog.setOnDismissListener {
+            updateItem(position, appInfo.packageName)
+        }
+    }
+
+    private fun updateItem(position: Int, packageName: String) {
+        viewModel.scheduleCounter.observe(viewLifecycleOwner) { event ->
+            event.getContentIfNotHandled()?.let {
+                if (it.status == Status.SUCCESS) {
+                    it.data?.let { counter ->
+                        if (it.extraValue > -1 && it.extraValue < items.size) {
+                            val item = items[it.extraValue]
+                            item.scheduleCounter = counter
+                            items[it.extraValue] = item
+                            adapter.notifyItemChanged(it.extraValue)
                         }
                     }
                 }
             }
+        }
+        viewModel.getSchedulersByPackageName(position, packageName)
+    }
+
+    private fun prepareSchedulerToSave(hour: Int, minute: Int, scheduler: Scheduler) {
+        scheduler.scheduleTime = if (hour > 9) {
+            "$hour"
         } else {
-            dBinding.timePicker.visibility = View.GONE
+            "0$hour"
         }
-        dBinding.switchButton.isChecked = appInfo.isScheduled
-
-        dBinding.switchButton.setOnCheckedChangeListener { buttonView, isChecked ->
-            if (isChecked) {
-                dBinding.timePicker.visibility = View.VISIBLE
-            } else {
-                dBinding.timePicker.visibility = View.GONE
-            }
+        scheduler.scheduleTime += if (minute > 9) {
+            ":$minute"
+        } else {
+            ":0$minute"
         }
 
-        dBinding.okButton.setOnClickListener {
-            val hour: Int
-            val minute: Int
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                hour = dBinding.timePicker.hour
-                minute = dBinding.timePicker.minute
-            } else {
-                hour = dBinding.timePicker.currentHour
-                minute = dBinding.timePicker.currentMinute
-            }
-            appInfo.scheduleTime = if (hour > 9) {
-                "$hour"
-            } else {
-                "0$hour"
-            }
-            appInfo.scheduleTime += if (minute > 9) {
-                ":$minute"
-            } else {
-                ":0$minute"
-            }
-
-            // Todo, need few more time finish the following task
-            // we need to check here time conflicting issue
-            // while saving the data into database and set alarm
-
-            appInfo.isScheduled = dBinding.switchButton.isChecked
-            val message = if (appInfo.isScheduled) {
-                viewModel.setAlarm(appInfo)
-                setAlarm(appInfo, hour, minute)
-                getString(R.string.schedule_set_for, appInfo.appName)
-            } else {
-                viewModel.cancelAlarm(appInfo.packageName)
-                cancelAlarm(appInfo)
-                getString(R.string.schedule_cancel_for, appInfo.appName)
-            }
-            showToast(message)
-            loginDialog.dismiss()
-
-            items[position] = appInfo
-            adapter.notifyItemChanged(position, true)
-        }
-
-        dBinding.cancelButton.setOnClickListener {
-            loginDialog.dismiss()
-        }
-
-        dBinding.cross.setOnClickListener {
-            loginDialog.dismiss()
-        }
+//        viewModel.setAlarm()
     }
 
     override fun onDestroyView() {

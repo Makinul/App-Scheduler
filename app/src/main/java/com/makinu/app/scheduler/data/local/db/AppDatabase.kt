@@ -1,16 +1,19 @@
 package com.makinu.app.scheduler.data.local.db
 
 import android.content.Context
-import androidx.room.Database
-import androidx.room.Room
-import androidx.room.RoomDatabase
+import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.makinu.app.scheduler.data.model.AppInfo
+import com.makinu.app.scheduler.data.model.Scheduler
 
 @Database(
-    entities = [AppInfo::class], version = 1
+    entities = [AppInfo::class, Scheduler::class],
+    version = 2
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun treeDao(): AppInfoDao
+    abstract fun scheduleDao(): SchedulerDao
 
     companion object {
         @Volatile
@@ -26,7 +29,16 @@ abstract class AppDatabase : RoomDatabase() {
         // https://medium.com/google-developers/7-pro-tips-for-room-fbadea4bfbd1#4785
         private fun buildDatabase(context: Context): AppDatabase {
             return Room.databaseBuilder(context, AppDatabase::class.java, "app_scheduler.sqlite")
+                .addMigrations(MIGRATION_1_2)
                 .build()
+        }
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE TABLE `Scheduler` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `uid` INTEGER NOT NULL, `scheduleTime` TEXT, `scheduleRunning` INTEGER NOT NULL, `isScheduled` INTEGER NOT NULL)"
+                )
+            }
         }
     }
 }

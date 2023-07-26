@@ -41,9 +41,7 @@ class MyForegroundService : Service() {
                 }
             }
         }
-
         stopSelf()
-
         return START_STICKY
     }
 
@@ -60,20 +58,22 @@ class MyForegroundService : Service() {
 //        stopService(this)
     }
 
+    private val serviceNotificationChannelId = "serviceNotificationChannelId"
+
     @RequiresApi(Build.VERSION_CODES.O)
     fun goToForeground() {
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
         val serviceChannel = NotificationChannel(
-            "serviceNotificationChannelId",
-            "Notification Service",
+            serviceNotificationChannelId,
+            "App Schedule notification service, to launch the scheduled app",
             NotificationManager.IMPORTANCE_DEFAULT
         )
         notificationManager.createNotificationChannel(serviceChannel)
 
         val notification: Notification =
-            NotificationCompat.Builder(this, "serviceNotificationChannelId")
-                .setContentTitle("Incoming call")
+            NotificationCompat.Builder(this, serviceNotificationChannelId)
+                .setContentTitle("To Launch the scheduled app")
                 .build()
 
         startForeground(-1, notification)
