@@ -2,7 +2,6 @@ package com.makinu.app.scheduler.ui.main.home
 
 import android.content.Context
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.makinu.app.scheduler.R
@@ -73,7 +72,7 @@ class ScheduleAdapter(
                 if (item.isScheduled)
                     context.getString(R.string.schedule_done, "at $scheduleTime")
                 else
-                    context.getString(R.string.schedule_canceled, "for $scheduleTime")
+                    context.getString(R.string.schedule_canceled, scheduleTime)
             }
             binding.appSchedule.text = status
         }

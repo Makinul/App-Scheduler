@@ -216,9 +216,9 @@ class HomeFragment : BaseFragment() {
 
                             val scheduler = Scheduler()
                             scheduler.isScheduled = false
-
+                            scheduler.id = item.id
                             scheduler.scheduleTime = "$hourOfDay:$minute"
-                            scheduler.scheduleRunning = item.scheduleRunning
+                            scheduler.scheduleRunning = true
                             scheduler.uid = item.uid
                             scheduler.appName = appInfo.appName
                             scheduler.packageName = appInfo.packageName
