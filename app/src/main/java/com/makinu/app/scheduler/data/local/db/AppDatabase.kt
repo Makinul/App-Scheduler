@@ -36,7 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
-                    "CREATE TABLE `Scheduler` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `uid` INTEGER NOT NULL, `scheduleTime` TEXT, `scheduleRunning` INTEGER NOT NULL, `isScheduled` INTEGER NOT NULL)"
+                    "CREATE TABLE `Scheduler` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `appName` TEXT NOT NULL, `uid` INTEGER NOT NULL, `scheduleTime` TEXT, `scheduleRunning` INTEGER NOT NULL, `isScheduled` INTEGER NOT NULL)"
                 )
             }
         }
