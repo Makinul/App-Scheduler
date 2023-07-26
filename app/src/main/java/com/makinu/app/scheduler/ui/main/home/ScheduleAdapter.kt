@@ -54,7 +54,6 @@ class ScheduleAdapter(
 
             binding.delete.setOnClickListener {
                 listener.onDeleteScheduler(layoutPosition, list[layoutPosition])
-                notifyItemRemoved(layoutPosition)
             }
         }
 
