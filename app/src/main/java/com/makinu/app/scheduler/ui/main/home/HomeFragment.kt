@@ -210,7 +210,7 @@ class HomeFragment : BaseFragment() {
                             setTime.set(Calendar.MINUTE, minute)
                             setTime.set(Calendar.SECOND, 0)
 
-                            if (setTime.timeInMillis < currentTimeAgain.timeInMillis) {
+                            if (setTime.timeInMillis <= currentTimeAgain.timeInMillis) {
                                 setTime.add(Calendar.DAY_OF_MONTH, 1)
                             }
 
@@ -265,7 +265,7 @@ class HomeFragment : BaseFragment() {
 
                 val setTime = AppConstants.timeToCalendar(item.scheduleTime)
 
-                if (setTime.timeInMillis < currentTimeAgain.timeInMillis) {
+                if (setTime.timeInMillis <= currentTimeAgain.timeInMillis) {
                     setTime.add(Calendar.DAY_OF_MONTH, 1)
                 }
 
@@ -322,7 +322,7 @@ class HomeFragment : BaseFragment() {
                         setTime.set(Calendar.MINUTE, minute)
                         setTime.set(Calendar.SECOND, 0)
 
-                        if (setTime.timeInMillis < currentTimeAgain.timeInMillis) {
+                        if (setTime.timeInMillis <= currentTimeAgain.timeInMillis) {
                             setTime.add(Calendar.DAY_OF_MONTH, 1)
                         }
 
