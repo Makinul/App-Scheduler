@@ -107,7 +107,7 @@ class ScheduleReceiver : BroadcastReceiver() {
                 val builder = NotificationCompat.Builder(context, appOpeningChannelId)
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentTitle("$appName opening")
-                    .setContentText("$appName is going to open now, this notification is just for information purpose.")
+                    .setContentText("$appName already opened, it is just a information.")
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     // Set the intent that will fire when the user taps the notification
                     .setContentIntent(pendingIntent).setAutoCancel(true)

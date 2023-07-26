@@ -39,7 +39,14 @@ class MyBootReceiver : BroadcastReceiver() {
                     val alarmManager =
                         context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
 
-                    val calendar = AppConstants.timeToCalendar(item.scheduleTime)
+                    val currentTimeAgain = Calendar.getInstance()
+                    currentTimeAgain.set(Calendar.SECOND, 0)
+
+                    val setTime = AppConstants.timeToCalendar(item.scheduleTime)
+
+                    if (setTime.timeInMillis <= currentTimeAgain.timeInMillis) {
+                        setTime.add(Calendar.DAY_OF_MONTH, 1)
+                    }
 
                     val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
                         intent.putExtra(AppConstants.KEY_SCHEDULER_ID, item.id)
@@ -49,11 +56,11 @@ class MyBootReceiver : BroadcastReceiver() {
 
                         intent.putExtra(
                             AppConstants.KEY_ALARM_HOUR,
-                            calendar.get(Calendar.HOUR_OF_DAY)
+                            setTime.get(Calendar.HOUR_OF_DAY)
                         )
                         intent.putExtra(
                             AppConstants.KEY_ALARM_MINUTE,
-                            calendar.get(Calendar.MINUTE)
+                            setTime.get(Calendar.MINUTE)
                         )
 
                         PendingIntent.getBroadcast(
@@ -69,7 +76,7 @@ class MyBootReceiver : BroadcastReceiver() {
 
                     // to schedule in exact time
                     alarmManager?.setExact(
-                        AlarmManager.RTC_WAKEUP, calendar.timeInMillis, alarmIntent
+                        AlarmManager.RTC_WAKEUP, setTime.timeInMillis, alarmIntent
                     )
                 }
             }

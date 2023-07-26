@@ -123,7 +123,68 @@ class HomeFragment : BaseFragment() {
         }
 
         context?.let { viewModel.getLauncherApps(it) }
+
+        viewModel.schedulers.observe(viewLifecycleOwner) { event ->
+            event.getContentIfNotHandled()?.let {
+                if (it.status == Status.SUCCESS) {
+                    schedulers.clear()
+                    it.data?.let { list ->
+                        schedulers.addAll(list)
+                    }
+                    schedulerAdapter?.notifyDataSetChanged()
+                }
+            }
+        }
+
+        viewModel.scheduler.observe(viewLifecycleOwner) { event ->
+            event.getContentIfNotHandled()?.let {
+                if (it.status == Status.ERROR) {
+                    val message = it.message ?: "Unknown error, please try again"
+                    showSimpleDialog(message)
+                    return@observe
+                }
+                it.data?.let { scheduler ->
+                    val id = scheduler.id
+                    if (id == 0) {
+                        val message = it.message ?: "Unknown error, please try again"
+                        showSimpleDialog(message)
+                        return@observe
+                    }
+
+                    val currentTimeAgain = Calendar.getInstance()
+                    currentTimeAgain.set(Calendar.SECOND, 0)
+
+                    val setTime = AppConstants.timeToCalendar(scheduler.scheduleTime)
+
+                    if (setTime.timeInMillis <= currentTimeAgain.timeInMillis) {
+                        setTime.add(Calendar.DAY_OF_MONTH, 1)
+                    }
+
+                    if (it.extraValue > -1 && it.extraValue < schedulers.size) { // update
+                        schedulers[it.extraValue] = scheduler
+                        if (scheduler.scheduleRunning) {
+                            setAlarm(
+                                scheduler,
+                                calendar = setTime
+                            )
+                        } else {
+                            cancelAlarm(scheduler)
+                        }
+                        schedulerAdapter?.notifyItemChanged(it.extraValue)
+                    } else { // insert
+                        schedulers.add(scheduler)
+                        setAlarm(
+                            scheduler,
+                            calendar = setTime
+                        )
+                        schedulerAdapter?.notifyItemInserted(schedulers.size - 1)
+                    }
+                }
+            }
+        }
     }
+
+    private val schedulers: ArrayList<Scheduler> = ArrayList()
 
     private fun updateView() {
         if (items.isEmpty()) {
@@ -192,7 +253,7 @@ class HomeFragment : BaseFragment() {
         dBinding.packageName.text = appInfo.packageName
         dBinding.icon.setImageBitmap(appInfo.icon)
 
-        val schedulers: ArrayList<Scheduler> = ArrayList()
+        schedulers.clear()
         schedulerAdapter = ScheduleAdapter(schedulers, object : ScheduleAdapter.OnClickListener {
             override fun clickOnView(position: Int, isSelected: Boolean, item: Scheduler) {
                 val currentTime = AppConstants.timeToCalendar(item.scheduleTime)
@@ -202,48 +263,16 @@ class HomeFragment : BaseFragment() {
                 val timePickerDialog =
                     TimePickerDialog(
                         context, { view, hourOfDay, minute ->
-                            val currentTimeAgain = Calendar.getInstance()
-                            currentTimeAgain.set(Calendar.SECOND, 0)
-
-                            val setTime = Calendar.getInstance()
-                            setTime.set(Calendar.HOUR_OF_DAY, hourOfDay)
-                            setTime.set(Calendar.MINUTE, minute)
-                            setTime.set(Calendar.SECOND, 0)
-
-                            if (setTime.timeInMillis <= currentTimeAgain.timeInMillis) {
-                                setTime.add(Calendar.DAY_OF_MONTH, 1)
-                            }
-
                             val scheduler = Scheduler()
                             scheduler.isScheduled = false
                             scheduler.id = item.id
                             scheduler.scheduleTime = "$hourOfDay:$minute"
                             scheduler.scheduleRunning = true
                             scheduler.uid = item.uid
-                            scheduler.appName = appInfo.appName
-                            scheduler.packageName = appInfo.packageName
+                            scheduler.appName = item.appName
+                            scheduler.packageName = item.packageName
 
-                            viewModel.schedulerId.observe(viewLifecycleOwner) { event ->
-                                event.getContentIfNotHandled()?.let {
-                                    val id: Int = (it.data ?: 0).toInt()
-                                    if (it.status == Status.ERROR || id == 0) {
-                                        val message =
-                                            it.message ?: "Unknown error, please try again"
-                                        showSimpleDialog(message)
-                                        return@observe
-                                    }
-
-                                    scheduler.id = id
-                                    schedulers[position] = scheduler
-
-                                    setAlarm(
-                                        scheduler,
-                                        calendar = setTime
-                                    )
-                                    schedulerAdapter?.notifyItemChanged(position)
-                                }
-                            }
-                            viewModel.updateScheduler(scheduler)
+                            viewModel.updateScheduler(position, scheduler)
                         },
                         currentHour,
                         currentMin,
@@ -257,26 +286,7 @@ class HomeFragment : BaseFragment() {
                 item.scheduleRunning = isSelected
                 schedulers[position] = item
 
-                schedulerAdapter?.notifyItemChanged(position)
-                viewModel.updateScheduler(item)
-
-                val currentTimeAgain = Calendar.getInstance()
-                currentTimeAgain.set(Calendar.SECOND, 0)
-
-                val setTime = AppConstants.timeToCalendar(item.scheduleTime)
-
-                if (setTime.timeInMillis <= currentTimeAgain.timeInMillis) {
-                    setTime.add(Calendar.DAY_OF_MONTH, 1)
-                }
-
-                if (isSelected) {
-                    setAlarm(
-                        item,
-                        calendar = setTime
-                    )
-                } else {
-                    cancelAlarm(item)
-                }
+                viewModel.updateScheduler(position, item)
             }
 
             override fun onDeleteScheduler(position: Int, item: Scheduler) {
@@ -293,17 +303,6 @@ class HomeFragment : BaseFragment() {
             adapter = schedulerAdapter
         }
 
-        viewModel.schedulers.observe(viewLifecycleOwner) { event ->
-            event.peekContent().let {
-                if (it.status == Status.SUCCESS) {
-                    schedulers.clear()
-                    it.data?.let { list ->
-                        schedulers.addAll(list)
-                    }
-                    schedulerAdapter?.notifyDataSetChanged()
-                }
-            }
-        }
         viewModel.getSchedulers(appInfo)
 
         dBinding.add.setOnClickListener {
@@ -314,18 +313,6 @@ class HomeFragment : BaseFragment() {
             val timePickerDialog =
                 TimePickerDialog(
                     context, { view, hourOfDay, minute ->
-                        val currentTimeAgain = Calendar.getInstance()
-                        currentTimeAgain.set(Calendar.SECOND, 0)
-
-                        val setTime = Calendar.getInstance()
-                        setTime.set(Calendar.HOUR_OF_DAY, hourOfDay)
-                        setTime.set(Calendar.MINUTE, minute)
-                        setTime.set(Calendar.SECOND, 0)
-
-                        if (setTime.timeInMillis <= currentTimeAgain.timeInMillis) {
-                            setTime.add(Calendar.DAY_OF_MONTH, 1)
-                        }
-
                         val scheduler = Scheduler()
                         scheduler.isScheduled = false
                         scheduler.scheduleTime = "$hourOfDay:$minute"
@@ -334,25 +321,6 @@ class HomeFragment : BaseFragment() {
                         scheduler.appName = appInfo.appName
                         scheduler.packageName = appInfo.packageName
 
-                        viewModel.schedulerId.observe(viewLifecycleOwner) { event ->
-                            event.getContentIfNotHandled()?.let {
-                                val id: Int = (it.data ?: 0).toInt()
-                                if (it.status == Status.ERROR || id == 0) {
-                                    val message = it.message ?: "Unknown error, please try again"
-                                    showSimpleDialog(message)
-                                    return@observe
-                                }
-
-                                scheduler.id = id
-                                schedulers.add(scheduler)
-
-                                setAlarm(
-                                    scheduler,
-                                    calendar = setTime
-                                )
-                                schedulerAdapter?.notifyItemInserted(schedulers.size - 1)
-                            }
-                        }
                         viewModel.insertScheduler(scheduler)
                     },
                     currentHour,
@@ -376,6 +344,7 @@ class HomeFragment : BaseFragment() {
         }
 
         schedulerDialog.setOnDismissListener {
+            schedulerAdapter = null
             updateItem(position, appInfo.packageName)
         }
     }
