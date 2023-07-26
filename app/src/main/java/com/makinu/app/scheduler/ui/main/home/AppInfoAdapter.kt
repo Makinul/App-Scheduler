@@ -6,10 +6,8 @@ import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.makinu.app.scheduler.R
-import com.makinu.app.scheduler.data.model.AppInfo
 import com.makinu.app.scheduler.data.model.AppUiInfo
 import com.makinu.app.scheduler.databinding.ItemAppInfoBinding
-import com.makinu.app.scheduler.utils.AppConstants.timeConversion
 
 class AppInfoAdapter(
     private val list: List<AppUiInfo>,
@@ -54,10 +52,9 @@ class AppInfoAdapter(
             binding.packageName.text = item.packageName
             binding.icon.setImageBitmap(item.icon)
 
-            val color = if (item.isScheduled) {
-                val scheduleTime = timeConversion(item.scheduleTime)
+            val color = if (item.scheduleCounter > 0) {
                 binding.scheduleStatus.text =
-                    context.getString(R.string.schedule_active, scheduleTime)
+                    context.getString(R.string.schedule_active, item.scheduleCounter.toString())
                 ContextCompat.getColor(context, R.color.positive)
             } else {
                 binding.scheduleStatus.text = context.getString(R.string.schedule_off)

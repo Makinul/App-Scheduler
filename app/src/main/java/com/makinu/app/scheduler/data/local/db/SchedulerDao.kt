@@ -9,11 +9,20 @@ interface SchedulerDao {
     @Query("SELECT * FROM scheduler")
     fun getAll(): List<Scheduler>
 
+    @Query("SELECT * FROM scheduler WHERE scheduleRunning = 1")
+    fun getRunningSchedulers(): List<Scheduler>
+
     @Query("SELECT * FROM scheduler WHERE packageName = :packageName")
     fun getSchedulersByPackageName(packageName: String): List<Scheduler>
 
+    @Query("SELECT * FROM scheduler WHERE packageName = :packageName AND scheduleRunning = 1")
+    fun getActiveSchedulersByPackageName(packageName: String): List<Scheduler>
+
+    @Query("SELECT * FROM scheduler WHERE scheduleTime = :scheduleTime")
+    fun getSchedulersByTime(scheduleTime: String): List<Scheduler>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insert(item: Scheduler)
+    fun insert(item: Scheduler): Long
 
     @Update
     fun update(item: Scheduler)
@@ -29,6 +38,9 @@ interface SchedulerDao {
 
     @Query("UPDATE scheduler SET isScheduled = 0 where id = :id")
     fun cancelScheduler(id: Int)
+
+    @Query("UPDATE scheduler SET isScheduled = 1, scheduleRunning = 0 where id = :id")
+    fun completeScheduler(id: Int)
 
     @Query("DELETE FROM scheduler")
     suspend fun deleteAll()

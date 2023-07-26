@@ -32,15 +32,17 @@ class ScheduleAdapter(
         return position
     }
 
-    private var lastItemSelectedPosition = -1
-
     inner class ViewHolder(
         private val binding: ItemAppSchedulerBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
         init {
             itemView.setOnClickListener {
-
+                listener.clickOnView(
+                    layoutPosition,
+                    binding.switchButton.isChecked,
+                    list[layoutPosition]
+                )
             }
 
             binding.switchButton.setOnClickListener {
@@ -50,8 +52,10 @@ class ScheduleAdapter(
                     list[layoutPosition]
                 )
             }
+
             binding.delete.setOnClickListener {
                 listener.onDeleteScheduler(layoutPosition, list[layoutPosition])
+                notifyItemRemoved(layoutPosition)
             }
         }
 
@@ -62,7 +66,16 @@ class ScheduleAdapter(
             binding.switchButton.isChecked = item.scheduleRunning
 
             val scheduleTime = AppConstants.timeConversion(item.scheduleTime)
-            binding.appSchedule.text = context.getString(R.string.schedule_active, scheduleTime)
+
+            val status = if (item.scheduleRunning) {
+                context.getString(R.string.schedule_active, "at $scheduleTime")
+            } else {
+                if (item.isScheduled)
+                    context.getString(R.string.schedule_done, "at $scheduleTime")
+                else
+                    context.getString(R.string.schedule_canceled, "for $scheduleTime")
+            }
+            binding.appSchedule.text = status
         }
     }
 

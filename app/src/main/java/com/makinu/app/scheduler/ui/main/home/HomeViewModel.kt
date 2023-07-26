@@ -39,14 +39,57 @@ class HomeViewModel @Inject constructor(
         _schedulers.postValue(Event(Resource.success(items)))
     }
 
-    fun setScheduler(scheduler: Scheduler) = viewModelScope.launch(Dispatchers.IO) {
-        val item = schedulerDao.insert(scheduler)
-        Log.v("setScheduler", item.toString())
-    }
+
+    private val _scheduleCounter by lazy { MutableLiveData<Event<Resource<Int>>>() }
+    val scheduleCounter: LiveData<Event<Resource<Int>>>
+        get() = _scheduleCounter
+
+    fun getSchedulersByPackageName(position: Int, packageName: String) =
+        viewModelScope.launch(Dispatchers.IO) {
+            val items = schedulerDao.getActiveSchedulersByPackageName(packageName)
+            _scheduleCounter.postValue(Event(Resource.success(items.size, extraValue = position)))
+        }
+
+//    fun getSchedulerCounterByPackageName(packageName: String): Int {
+//        val items = schedulerDao.getActiveSchedulersByPackageName(packageName)
+//        return items.size
+//    }
 
     fun deleteScheduler(scheduler: Scheduler) = viewModelScope.launch(Dispatchers.IO) {
         val item = schedulerDao.delete(scheduler)
-        Log.v("setScheduler", item.toString())
+        Log.v("deleteScheduler", item.toString())
+    }
+
+    private val _schedulerId by lazy { MutableLiveData<Event<Resource<Long>>>() }
+    val schedulerId: LiveData<Event<Resource<Long>>>
+        get() = _schedulerId
+
+    fun insertScheduler(scheduler: Scheduler) = viewModelScope.launch(Dispatchers.IO) {
+        if (scheduler.scheduleTime != null) {
+            val isExistData = schedulerDao.getSchedulersByTime(scheduler.scheduleTime!!)
+            if (isExistData.isNotEmpty()) {
+                _schedulerId.postValue(Event(Resource.error("This time already exist, please try with another")))
+                return@launch
+            }
+        }
+        val id = schedulerDao.insert(scheduler)
+        Log.v("setScheduler", id.toString())
+        _schedulerId.postValue(Event(Resource.success(id)))
+    }
+
+    fun updateScheduler(scheduler: Scheduler) = viewModelScope.launch(Dispatchers.IO) {
+        if (scheduler.scheduleTime != null) {
+            val isExistData = schedulerDao.getSchedulersByTime(scheduler.scheduleTime!!)
+            if (isExistData.isNotEmpty()) {
+                if (isExistData[0].id != scheduler.id) {
+                    _schedulerId.postValue(Event(Resource.error("This time already exist, please try with another")))
+                    return@launch
+                }
+            }
+        }
+        schedulerDao.update(scheduler)
+        Log.v("updateScheduler", scheduler.id.toString())
+        _schedulerId.postValue(Event(Resource.success(scheduler.id.toLong())))
     }
 
     fun setAlarm(appUiInfo: AppUiInfo) = viewModelScope.launch(Dispatchers.IO) {
@@ -91,9 +134,8 @@ class HomeViewModel @Inject constructor(
                 appInfo.userHandle = profile
                 appInfo.icon = getBitmapIcon(context, info.getBadgedIcon(0))
 
-                appDao.getAppInfoByPackageName(appInfo.packageName)?.let {
-                    appInfo.scheduleTime = it.scheduleTime
-                    appInfo.isScheduled = it.isScheduled
+                schedulerDao.getActiveSchedulersByPackageName(appInfo.packageName).let {
+                    appInfo.scheduleCounter = it.size
                 }
 
                 items.add(appInfo)

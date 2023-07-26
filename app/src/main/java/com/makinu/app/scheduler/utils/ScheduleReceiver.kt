@@ -19,6 +19,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.makinu.app.scheduler.R
 import com.makinu.app.scheduler.data.local.db.AppDatabase
 import com.makinu.app.scheduler.data.local.db.AppInfoDao
+import com.makinu.app.scheduler.data.local.db.SchedulerDao
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +31,11 @@ import javax.inject.Inject
 class ScheduleReceiver : BroadcastReceiver() {
 
     @Inject
-    lateinit var dao: AppInfoDao
+    lateinit var appInfoDao: AppInfoDao
+
+    @Inject
+    lateinit var schedulerDao: SchedulerDao
+
     private val TAG = "ScheduleReceiver"
 
     /** If the alarm is older than STALE_WINDOW seconds, ignore.  It
@@ -39,6 +44,7 @@ class ScheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val appName = intent.getStringExtra(AppConstants.KEY_APP_NAME)
         val packageName = intent.getStringExtra(AppConstants.KEY_PACKAGE_NAME)
+        val id = intent.getIntExtra(AppConstants.KEY_SCHEDULER_ID, -1)
         val uid = intent.getIntExtra(AppConstants.KEY_APP_UID, -1)
         val hour = intent.getIntExtra(AppConstants.KEY_ALARM_HOUR, 0)
         val minute = intent.getIntExtra(AppConstants.KEY_ALARM_MINUTE, 0)
@@ -47,49 +53,19 @@ class ScheduleReceiver : BroadcastReceiver() {
         if (packageName != null) {
             val coroutineScope = CoroutineScope(Dispatchers.IO)
             coroutineScope.launch {
-                if (!::dao.isInitialized) {
+                if (!::appInfoDao.isInitialized || !::schedulerDao.isInitialized) {
                     val database = AppDatabase.getInstance(context)
-                    dao = database.treeDao()
-                }
-                val appInfo = dao.getAppInfoByPackageName(packageName)
-                appInfo?.let {
-                    it.successfulScheduledCounter += 1
-                    dao.update(it)
-                }
-                Log.v(TAG, appInfo?.appName ?: "Not found")
-                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-
-                val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
-                    intent.putExtra(AppConstants.KEY_APP_UID, uid)
-                    intent.putExtra(AppConstants.KEY_APP_NAME, appName)
-                    intent.putExtra(AppConstants.KEY_PACKAGE_NAME, packageName)
-
-                    intent.putExtra(AppConstants.KEY_ALARM_HOUR, hour)
-                    intent.putExtra(AppConstants.KEY_ALARM_MINUTE, minute)
-
-                    PendingIntent.getBroadcast(
-                        context, uid, intent, PendingIntent.FLAG_CANCEL_CURRENT
-                    )
+                    appInfoDao = database.treeDao()
+                    schedulerDao = database.scheduleDao()
                 }
 
-                if (alarmIntent != null && alarmManager != null) {
-                    alarmManager.cancel(alarmIntent)
-                }
+//                val appInfo = appInfoDao.getAppInfoByPackageName(packageName)
+//                appInfo?.let {
+//                    it.successfulScheduledCounter += 1
+//                    appInfoDao.update(it)
+//                }
 
-                val calendar: Calendar = Calendar.getInstance().apply {
-                    timeInMillis = System.currentTimeMillis()
-
-                    set(Calendar.HOUR_OF_DAY, hour)
-                    set(Calendar.MINUTE, minute)
-                    set(Calendar.SECOND, 0)
-                }
-
-                calendar.add(Calendar.DAY_OF_MONTH, 1)
-
-                // to schedule in exact time
-                alarmManager?.setExact(
-                    AlarmManager.RTC_WAKEUP, calendar.timeInMillis, alarmIntent
-                )
+                schedulerDao.completeScheduler(id)
             }
         }
 
@@ -98,34 +74,15 @@ class ScheduleReceiver : BroadcastReceiver() {
         )
 
         val serviceIntent = Intent(context, MyForegroundService::class.java)
-        serviceIntent.putExtra(
-            AppConstants.KEY_APP_NAME,
-            intent.getStringExtra(AppConstants.KEY_APP_NAME)
-        )
-        serviceIntent.putExtra(
-            AppConstants.KEY_PACKAGE_NAME,
-            intent.getStringExtra(AppConstants.KEY_PACKAGE_NAME)
-        )
-        serviceIntent.putExtra(
-            AppConstants.KEY_APP_UID,
-            intent.getIntExtra(AppConstants.KEY_APP_UID, -1)
-        )
-        serviceIntent.putExtra(
-            AppConstants.KEY_ALARM_HOUR,
-            intent.getIntExtra(AppConstants.KEY_ALARM_HOUR, 0)
-        )
-        serviceIntent.putExtra(
-            AppConstants.KEY_ALARM_MINUTE,
-            intent.getIntExtra(AppConstants.KEY_ALARM_MINUTE, 0)
-        )
+        serviceIntent.putExtra(AppConstants.KEY_APP_NAME, appName)
+        serviceIntent.putExtra(AppConstants.KEY_PACKAGE_NAME, packageName)
+        serviceIntent.putExtra(AppConstants.KEY_APP_UID, uid)
+        serviceIntent.putExtra(AppConstants.KEY_SCHEDULER_ID, id)
+        serviceIntent.putExtra(AppConstants.KEY_ALARM_HOUR, hour)
+        serviceIntent.putExtra(AppConstants.KEY_ALARM_MINUTE, minute)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!Settings.canDrawOverlays(context)) {
-                createNotificationChannel(context)
-                generateNotification(context, uid, appName, packageName)
-                return
-            }
-        }
+        createNotificationChannel(context)
+        generateNotification(context, uid, appName, packageName)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(serviceIntent)
@@ -148,8 +105,10 @@ class ScheduleReceiver : BroadcastReceiver() {
                     PendingIntent.getActivity(context, uid, fireIntent, PendingIntent.FLAG_ONE_SHOT)
 
                 val builder = NotificationCompat.Builder(context, appOpeningChannelId)
-                    .setSmallIcon(R.mipmap.ic_launcher).setContentTitle(appName)
-                    .setContentText(packageName).setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentTitle("$appName opening")
+                    .setContentText("$appName is going to open now, this notification is just for information purpose.")
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     // Set the intent that will fire when the user taps the notification
                     .setContentIntent(pendingIntent).setAutoCancel(true)
 

@@ -16,8 +16,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
-import android.widget.TimePicker
-import android.widget.TimePicker.OnTimeChangedListener
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
@@ -134,62 +132,40 @@ class HomeFragment : BaseFragment() {
         adapter.notifyDataSetChanged()
     }
 
-    private fun cancelAlarm(item: AppUiInfo) {
+    private fun cancelAlarm(item: Scheduler) {
         val alarmManager = context?.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
         val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
-            PendingIntent.getBroadcast(context, item.uid, intent, PendingIntent.FLAG_CANCEL_CURRENT)
+            PendingIntent.getBroadcast(context, item.id, intent, PendingIntent.FLAG_CANCEL_CURRENT)
         }
         if (alarmIntent != null && alarmManager != null) {
             alarmManager.cancel(alarmIntent)
         }
     }
 
-    private fun setAlarm(item: AppUiInfo, hour: Int, minute: Int) {
+    private fun setAlarm(item: Scheduler, calendar: Calendar) {
         val alarmManager = context?.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
         val alarmIntent = Intent(context, ScheduleReceiver::class.java).let { intent ->
+            intent.putExtra(AppConstants.KEY_SCHEDULER_ID, item.id)
             intent.putExtra(AppConstants.KEY_APP_UID, item.uid)
             intent.putExtra(AppConstants.KEY_APP_NAME, item.appName)
             intent.putExtra(AppConstants.KEY_PACKAGE_NAME, item.packageName)
 
-            intent.putExtra(AppConstants.KEY_ALARM_HOUR, hour)
-            intent.putExtra(AppConstants.KEY_ALARM_MINUTE, minute)
+            intent.putExtra(AppConstants.KEY_ALARM_HOUR, calendar.get(Calendar.HOUR_OF_DAY))
+            intent.putExtra(AppConstants.KEY_ALARM_MINUTE, calendar.get(Calendar.MINUTE))
 
-            PendingIntent.getBroadcast(context, item.uid, intent, PendingIntent.FLAG_CANCEL_CURRENT)
+            PendingIntent.getBroadcast(context, item.id, intent, PendingIntent.FLAG_CANCEL_CURRENT)
         }
         if (alarmIntent != null && alarmManager != null) {
             alarmManager.cancel(alarmIntent)
         }
-
-        val calendar: Calendar = Calendar.getInstance().apply {
-            timeInMillis = System.currentTimeMillis()
-
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-        }
-
-        // it trigger approximate time
-//        alarmManager?.setInexactRepeating(
-//            AlarmManager.RTC_WAKEUP,
-//            calendar.timeInMillis,
-//            AlarmManager.INTERVAL_DAY,
-//            alarmIntent
-//        )
-//
-//        val elapsedTime = SystemClock.elapsedRealtime()
-//        val calendarTime = calendar.timeInMillis
-//
-//        alarmManager?.set(
-//            AlarmManager.RTC_WAKEUP,
-//            calendarTime,
-//            alarmIntent
-//        )
 
         // to schedule in exact time
         alarmManager?.setExact(
             AlarmManager.RTC_WAKEUP, calendar.timeInMillis, alarmIntent
         )
     }
+
+    private var schedulerAdapter: ScheduleAdapter? = null
 
     fun showAppScheduleDialog(position: Int, appInfo: AppUiInfo) {
         val schedulerDialog = Dialog(context!!)
@@ -217,21 +193,100 @@ class HomeFragment : BaseFragment() {
         dBinding.icon.setImageBitmap(appInfo.icon)
 
         val schedulers: ArrayList<Scheduler> = ArrayList()
-        val schedulerAdapter =
-            ScheduleAdapter(schedulers, object : ScheduleAdapter.OnClickListener {
-                override fun clickOnView(position: Int, isSelected: Boolean, item: Scheduler) {
+        schedulerAdapter = ScheduleAdapter(schedulers, object : ScheduleAdapter.OnClickListener {
+            override fun clickOnView(position: Int, isSelected: Boolean, item: Scheduler) {
+                val currentTime = AppConstants.timeToCalendar(item.scheduleTime)
+                val currentHour = currentTime[Calendar.HOUR_OF_DAY]
+                val currentMin = currentTime[Calendar.MINUTE]
 
+                val timePickerDialog =
+                    TimePickerDialog(
+                        context, { view, hourOfDay, minute ->
+                            val currentTimeAgain = Calendar.getInstance()
+                            currentTimeAgain.set(Calendar.SECOND, 0)
+
+                            val setTime = Calendar.getInstance()
+                            setTime.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                            setTime.set(Calendar.MINUTE, minute)
+                            setTime.set(Calendar.SECOND, 0)
+
+                            if (setTime.timeInMillis < currentTimeAgain.timeInMillis) {
+                                setTime.add(Calendar.DAY_OF_MONTH, 1)
+                            }
+
+                            val scheduler = Scheduler()
+                            scheduler.isScheduled = false
+
+                            scheduler.scheduleTime = "$hourOfDay:$minute"
+                            scheduler.scheduleRunning = item.scheduleRunning
+                            scheduler.uid = item.uid
+                            scheduler.appName = appInfo.appName
+                            scheduler.packageName = appInfo.packageName
+
+                            viewModel.schedulerId.observe(viewLifecycleOwner) { event ->
+                                event.getContentIfNotHandled()?.let {
+                                    val id: Int = (it.data ?: 0).toInt()
+                                    if (it.status == Status.ERROR || id == 0) {
+                                        val message =
+                                            it.message ?: "Unknown error, please try again"
+                                        showSimpleDialog(message)
+                                        return@observe
+                                    }
+
+                                    scheduler.id = id
+                                    schedulers[position] = scheduler
+
+                                    setAlarm(
+                                        scheduler,
+                                        calendar = setTime
+                                    )
+                                    schedulerAdapter?.notifyItemChanged(position)
+                                }
+                            }
+                            viewModel.updateScheduler(scheduler)
+                        },
+                        currentHour,
+                        currentMin,
+                        true
+                    )
+                timePickerDialog.setTitle(R.string.app_schedule_title)
+                timePickerDialog.show()
+            }
+
+            override fun onSaveScheduler(position: Int, isSelected: Boolean, item: Scheduler) {
+                item.scheduleRunning = isSelected
+                schedulers[position] = item
+
+                schedulerAdapter?.notifyItemChanged(position)
+                viewModel.updateScheduler(item)
+
+                val currentTimeAgain = Calendar.getInstance()
+                currentTimeAgain.set(Calendar.SECOND, 0)
+
+                val setTime = AppConstants.timeToCalendar(item.scheduleTime)
+
+                if (setTime.timeInMillis < currentTimeAgain.timeInMillis) {
+                    setTime.add(Calendar.DAY_OF_MONTH, 1)
                 }
 
-                override fun onSaveScheduler(position: Int, isSelected: Boolean, item: Scheduler) {
-
+                if (isSelected) {
+                    setAlarm(
+                        item,
+                        calendar = setTime
+                    )
+                } else {
+                    cancelAlarm(item)
                 }
+            }
 
-                override fun onDeleteScheduler(position: Int, item: Scheduler) {
-                    viewModel.deleteScheduler(item)
-                    schedulers.removeAt(position)
-                }
-            })
+            override fun onDeleteScheduler(position: Int, item: Scheduler) {
+                schedulers.removeAt(position)
+                schedulerAdapter?.notifyItemRemoved(position)
+                viewModel.deleteScheduler(item)
+
+                cancelAlarm(item)
+            }
+        })
 
         dBinding.recyclerView.apply {
             layoutManager = LinearLayoutManager(requireActivity(), VERTICAL, false)
@@ -245,10 +300,7 @@ class HomeFragment : BaseFragment() {
                     it.data?.let { list ->
                         schedulers.addAll(list)
                     }
-                    if (schedulers.isEmpty()) {
-                        schedulers.add(Scheduler(0, appInfo.packageName, appInfo.uid))
-                    }
-                    schedulerAdapter.notifyDataSetChanged()
+                    schedulerAdapter?.notifyDataSetChanged()
                 }
             }
         }
@@ -262,23 +314,53 @@ class HomeFragment : BaseFragment() {
             val timePickerDialog =
                 TimePickerDialog(
                     context, { view, hourOfDay, minute ->
+                        val currentTimeAgain = Calendar.getInstance()
+                        currentTimeAgain.set(Calendar.SECOND, 0)
+
+                        val setTime = Calendar.getInstance()
+                        setTime.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                        setTime.set(Calendar.MINUTE, minute)
+                        setTime.set(Calendar.SECOND, 0)
+
+                        if (setTime.timeInMillis < currentTimeAgain.timeInMillis) {
+                            setTime.add(Calendar.DAY_OF_MONTH, 1)
+                        }
+
                         val scheduler = Scheduler()
                         scheduler.isScheduled = false
                         scheduler.scheduleTime = "$hourOfDay:$minute"
                         scheduler.scheduleRunning = true
                         scheduler.uid = appInfo.uid
+                        scheduler.appName = appInfo.appName
                         scheduler.packageName = appInfo.packageName
-                        schedulers.add(scheduler)
-                        schedulerAdapter.notifyItemInserted(schedulers.size - 1)
 
-                        viewModel.setScheduler(scheduler)
+                        viewModel.schedulerId.observe(viewLifecycleOwner) { event ->
+                            event.getContentIfNotHandled()?.let {
+                                val id: Int = (it.data ?: 0).toInt()
+                                if (it.status == Status.ERROR || id == 0) {
+                                    val message = it.message ?: "Unknown error, please try again"
+                                    showSimpleDialog(message)
+                                    return@observe
+                                }
+
+                                scheduler.id = id
+                                schedulers.add(scheduler)
+
+                                setAlarm(
+                                    scheduler,
+                                    calendar = setTime
+                                )
+                                schedulerAdapter?.notifyItemInserted(schedulers.size - 1)
+                            }
+                        }
+                        viewModel.insertScheduler(scheduler)
                     },
                     currentHour,
                     currentMin,
                     true
                 )
-            timePickerDialog.setTitle("Select Time");
-            timePickerDialog.show();
+            timePickerDialog.setTitle(R.string.app_schedule_title)
+            timePickerDialog.show()
         }
 
         dBinding.okButton.setOnClickListener {
@@ -292,6 +374,28 @@ class HomeFragment : BaseFragment() {
         dBinding.cross.setOnClickListener {
             schedulerDialog.dismiss()
         }
+
+        schedulerDialog.setOnDismissListener {
+            updateItem(position, appInfo.packageName)
+        }
+    }
+
+    private fun updateItem(position: Int, packageName: String) {
+        viewModel.scheduleCounter.observe(viewLifecycleOwner) { event ->
+            event.getContentIfNotHandled()?.let {
+                if (it.status == Status.SUCCESS) {
+                    it.data?.let { counter ->
+                        if (it.extraValue > -1 && it.extraValue < items.size) {
+                            val item = items[it.extraValue]
+                            item.scheduleCounter = counter
+                            items[it.extraValue] = item
+                            adapter.notifyItemChanged(it.extraValue)
+                        }
+                    }
+                }
+            }
+        }
+        viewModel.getSchedulersByPackageName(position, packageName)
     }
 
     private fun prepareSchedulerToSave(hour: Int, minute: Int, scheduler: Scheduler) {
